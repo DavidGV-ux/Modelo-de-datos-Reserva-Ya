@@ -1,0 +1,62 @@
+{
+  "name": "reserwaya",
+  "version": "0.0.0",
+  "scripts": {
+    "ng": "ng",
+    "start": "ng serve",
+    "build": "ng build",
+    "watch": "ng build --watch --configuration development",
+    "test": "ng test",
+    "serve:ssr:reserwaya": "node dist/reserwaya/server/server.mjs",
+    "deploy:synth": "npm --prefix deploy/infra run synth",
+    "deploy:diff": "npm --prefix deploy/infra run diff",
+    "deploy": "npm run build && npm --prefix deploy/infra run deploy"
+  },
+  "prettier": {
+    "printWidth": 100,
+    "singleQuote": true,
+    "overrides": [
+      {
+        "files": "*.html",
+        "options": {
+          "parser": "angular"
+        }
+      }
+    ]
+  },
+  "private": true,
+  "packageManager": "npm@11.19.0",
+  "dependencies": {
+    "@angular/animations": "^20.1.8",
+    "@angular/cdk": "^21.2.14",
+    "@angular/common": "^21.0.0",
+    "@angular/compiler": "^21.0.0",
+    "@angular/core": "^21.0.0",
+    "@angular/forms": "^21.0.0",
+    "@angular/material": "^21.2.14",
+    "@angular/platform-browser": "^21.0.0",
+    "@angular/platform-server": "^21.0.0",
+    "@angular/router": "^21.0.0",
+    "@angular/ssr": "^21.0.4",
+    "@ngx-translate/core": "^18.0.0",
+    "@ngx-translate/http-loader": "^18.0.0",
+    "angular-oauth2-oidc": "^21.0.3",
+    "bootstrap": "^5.3.8",
+    "country-state-city": "^3.2.1",
+    "express": "^5.1.0",
+    "libphonenumber-js": "^1.13.14",
+    "rxjs": "~7.8.0",
+    "sweetalert2": "^11.26.25",
+    "tslib": "^2.3.0"
+  },
+  "devDependencies": {
+    "@angular/build": "^21.0.4",
+    "@angular/cli": "^21.0.4",
+    "@angular/compiler-cli": "^21.0.0",
+    "@types/express": "^5.0.1",
+    "@types/node": "^20.17.19",
+    "jsdom": "^27.1.0",
+    "typescript": "~5.9.2",
+    "vitest": "^4.0.8"
+  }
+}

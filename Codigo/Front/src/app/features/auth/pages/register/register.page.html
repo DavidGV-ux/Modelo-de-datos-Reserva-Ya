@@ -1,0 +1,102 @@
+<div class="register-page">
+  <div class="register-page__brand">
+    <a class="register-page__logo" routerLink="/">
+      <mat-icon>storefront</mat-icon>
+      <span>ReservaYa</span>
+    </a>
+  </div>
+
+  <div class="container">
+    <div class="row justify-content-center">
+      <div class="col-12 col-sm-10 col-md-8 col-lg-6 col-xl-5">
+        <mat-card class="register-card" appearance="outlined">
+          <mat-card-content>
+            <div class="register-card__header">
+              <div class="register-card__icon">
+                <mat-icon>person_add</mat-icon>
+              </div>
+              <h1 class="register-card__title">{{ 'auth.register.title' | translate }}</h1>
+              <p class="register-card__subtitle text-muted mb-0">
+                {{ 'auth.register.subtitle' | translate }}
+              </p>
+            </div>
+
+            <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+              <mat-form-field appearance="outline" class="w-100 mb-2">
+                <mat-label>{{ 'auth.register.name_label' | translate }}</mat-label>
+                <input matInput formControlName="name" autocomplete="name" />
+                @if (form.controls.name.hasError('required')) {
+                  <mat-error>{{ 'auth.register.name_required' | translate }}</mat-error>
+                }
+              </mat-form-field>
+
+              <mat-form-field appearance="outline" class="w-100 mb-2">
+                <mat-label>{{ 'auth.register.email_label' | translate }}</mat-label>
+                <input matInput formControlName="email" type="email" autocomplete="email" />
+                @if (form.controls.email.hasError('required')) {
+                  <mat-error>{{ 'auth.register.email_required' | translate }}</mat-error>
+                } @else if (form.controls.email.hasError('email')) {
+                  <mat-error>{{ 'auth.register.email_invalid' | translate }}</mat-error>
+                }
+              </mat-form-field>
+
+              <mat-form-field appearance="outline" class="w-100 mb-2">
+                <mat-label>{{ 'auth.register.password_label' | translate }}</mat-label>
+                <input matInput formControlName="password" type="password" autocomplete="new-password" />
+                @if (form.controls.password.hasError('required')) {
+                  <mat-error>{{ 'auth.register.password_required' | translate }}</mat-error>
+                } @else if (form.controls.password.hasError('minlength')) {
+                  <mat-error>{{ 'auth.register.password_min' | translate }}</mat-error>
+                }
+              </mat-form-field>
+
+              <mat-form-field appearance="outline" class="w-100 mb-2">
+                <mat-label>{{ 'auth.register.confirm_label' | translate }}</mat-label>
+                <input matInput formControlName="confirmPassword" type="password" autocomplete="new-password" />
+                @if (form.controls.confirmPassword.hasError('required')) {
+                  <mat-error>{{ 'auth.register.confirm_required' | translate }}</mat-error>
+                } @else if (form.controls.confirmPassword.hasError('mismatch')) {
+                  <mat-error>{{ 'auth.register.confirm_mismatch' | translate }}</mat-error>
+                }
+              </mat-form-field>
+
+              <div class="register-card__consent">
+                <mat-checkbox formControlName="habeasDataConsent" color="primary">
+                  {{ 'auth.register.consent_label' | translate }}
+                  <a class="register-card__privacy" routerLink="/privacidad">
+                    {{ 'auth.register.privacy_link' | translate }}
+                  </a>
+                </mat-checkbox>
+                @if (form.controls.habeasDataConsent.hasError('required')) {
+                  <mat-error class="register-card__consent-error">
+                    {{ 'auth.register.consent_required' | translate }}
+                  </mat-error>
+                }
+              </div>
+
+              <button
+                mat-flat-button
+                class="register-card__submit w-100"
+                color="primary"
+                type="submit"
+                [disabled]="submitting()"
+              >
+                @if (submitting()) {
+                  <mat-spinner [diameter]="20" />
+                } @else {
+                  <mat-icon>login</mat-icon>
+                  {{ 'auth.register.submit' | translate }}
+                }
+              </button>
+            </form>
+
+            <div class="register-card__footer text-center">
+              <span class="text-muted">{{ 'auth.register.login_prompt' | translate }}</span>
+              <a mat-stroked-button routerLink="/">{{ 'auth.register.login_link' | translate }}</a>
+            </div>
+          </mat-card-content>
+        </mat-card>
+      </div>
+    </div>
+  </div>
+</div>

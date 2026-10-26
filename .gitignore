@@ -1,0 +1,57 @@
+# Repos anidados: se conservan localmente como respaldo, no se suben
+.git-backup/
+**/.git-backup/
+
+# Dependencias
+node_modules/
+**/node_modules/
+
+# Variables de entorno y secretos (NUNCA subir .env)
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+*.pem
+*.key
+*.p12
+*.env
+**/*.env
+!**/.env.example
+
+# Compilados
+dist/
+dist-lambda/
+build/
+**/dist/
+**/dist-lambda/
+**/build/
+.angular/
+**/.angular/
+
+# Cobertura y logs
+coverage/
+**/coverage/
+*.log
+logs/
+**/logs/
+
+# Sistema y editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+
+# Serverless / AWS / artefactos de despliegue
+.serverless/
+**/.serverless/
+.aws-sam/
+**/.aws-sam/
+**/cdk.out/
+**/cdk-outputs.json
+*.zip
+
+# Infraestructura con credenciales reales de Keycloak (se mantiene solo local)
+Codigo/Front/deploy/

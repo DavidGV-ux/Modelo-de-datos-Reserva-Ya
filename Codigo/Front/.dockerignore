@@ -1,0 +1,14 @@
+# Keep the docker build context small. dist/ is the only runtime input.
+node_modules
+.angular
+.git
+.gitignore
+README.md
+coverage
+public
+src
+package-lock.json
+package.json
+deploy/infra
+*.log
+.DS_Store

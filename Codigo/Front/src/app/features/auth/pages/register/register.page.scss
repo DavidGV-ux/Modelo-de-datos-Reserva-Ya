@@ -1,0 +1,98 @@
+.register-page {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  padding: 1.5rem;
+  background:
+    radial-gradient(circle at 20% 0%, color-mix(in srgb, var(--mat-sys-primary) 16%, transparent), transparent 55%),
+    radial-gradient(circle at 90% 20%, color-mix(in srgb, var(--mat-sys-tertiary) 14%, transparent), transparent 50%),
+    var(--mat-sys-surface);
+}
+
+.register-page__brand {
+  margin-bottom: 1.5rem;
+}
+
+.register-page__logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.25rem;
+  font-weight: 600;
+  text-decoration: none;
+  color: var(--mat-sys-primary);
+}
+
+.register-card {
+  border-radius: 20px;
+  padding: 0.5rem 0.25rem;
+  box-shadow: var(--mat-sys-level3);
+}
+
+.register-card__header {
+  text-align: center;
+  margin-bottom: 1.5rem;
+}
+
+.register-card__icon {
+  width: 56px;
+  height: 56px;
+  margin: 0 auto 0.75rem;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--mat-sys-primary) 15%, transparent);
+  color: var(--mat-sys-primary);
+
+  mat-icon {
+    font-size: 28px;
+    width: 28px;
+    height: 28px;
+  }
+}
+
+.register-card__title {
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.register-card__consent {
+  margin: 0.5rem 0 1.25rem;
+}
+
+.register-card__consent-error {
+  display: block;
+  font-size: 0.75rem;
+  margin-top: 0.25rem;
+  padding-left: 1.5rem;
+}
+
+.register-card__privacy {
+  margin-left: 0.35rem;
+  font-weight: 500;
+}
+
+.register-card__submit {
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  border-radius: 999px;
+  font-size: 1rem;
+}
+
+.register-card__footer {
+  margin-top: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.register-card__footer a {
+  width: 100%;
+  max-width: 280px;
+  border-radius: 999px;
+}

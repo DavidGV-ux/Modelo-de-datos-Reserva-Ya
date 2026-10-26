@@ -1,0 +1,61 @@
+%% ============================================================
+%% Arquitecura hexagonal - Backend ReservaYa (vista general)
+%% Abrir en: https://mermaid.live o importar a diagrams.net (draw.io)
+%% ============================================================
+
+flowchart LR
+  %% ============ MUNDO EXTERIOR ============
+  subgraph EXT["Mundo exterior"]
+    BR["Frontend Angular SSR<br/>(CloudFront, /api)"]
+    KC["Keycloak (realm reserwaya)<br/>— issuer + JWKS token —<br/>— Admin REST (identidad) —"]
+    DB["MongoDB Atlas<br/>(reservaya)"]
+    PAY["Proveedor de pagos<br/>wompi / payu / mock"]
+    NOT["Canales de notificación<br/>whatsapp / email / sms"]
+  end
+
+  %% ============ PUERTOS DE ENTRADA (DRIVING) ============
+  subgraph DRIVING["Puestos de entrada · adaptadores driving (izquierda)"]
+    HTTP["Adapter REST (Express)<br/>routes: public · roles · admin<br/>onboarding · webhooks<br/>middleware: auth · errors"]
+    MID["Adapter SSR (Node) y Lambda<br/>(handler serverless)"]
+    SEED["Seed<br/>(bootstrap / datos demo)"]
+  end
+
+  %% ============ APLICACIÓN ============
+  subgraph APP["Aplicación · puertos de entrada (casos de uso)"]
+    SRV["AppServices<br/>(composition root / DI)"]
+    UC["Casos de uso:<br/>tenants · onboarding · catalog · availability<br/>booking · payments · history · dashboard · notifications"]
+  end
+
+  %% ============ DOMINIO / NÚCLEO ============
+  subgraph DOM["Dominio (núcleo) · NO conoce infraestructura"]
+    ENT["Entidades<br/>(tenant · appointment · availability<br/>catalog · payments · notifications)"]
+    RULES["Reglas de negocio puras<br/>(availability · booking · cancellation · payments)"]
+    PORTS_OUT["Puertos de salida (interfaces):<br/>repositories · unit-of-work · gateways<br/>(PaymentGatewayProvider · NotificationGateway<br/>· IdentityGateway)"]
+  end
+
+  %% ============ PUERTOS DE SALIDA (DRIVEN) ============
+  subgraph DRIVEN["Puestos de salida · adaptadores driven (derecha)"]
+    REPOS["Mongo Repositories<br/>plans · tenants · services · professionals<br/>appointments · availability · timeSlots<br/>paymentTransactions · ledger · notifications<br/>tenantUsers · platformUsers · audit"]
+    UOW["MongoUnitOfWork<br/>(transacciones ACID)"]
+    ID_AD["KeycloakAdminGateway<br/>(IdentityGateway)"]
+    PAY_AD["Payment adapter<br/>MockPaymentGateway → futuros<br/>PayUPaymentGateway / WompiPaymentGateway"]
+    NOT_AD["Notification adapter<br/>MockNotificationGateway → futuro<br/>WhatsApp / Email adapters"]
+  end
+
+  %% ============ FLUJOS ============
+  BR -->|"HTTP / REST + Bearer JWT + x-tenant-id"| HTTP
+  KC -->|"login / callback / JWKS de validación"| HTTP
+  HTTP -->|"invoca puertos de entrada"| SRV
+  MID --> SRV
+  SEED -->|"repos directamente (bootstrap)"| REPOS
+  SRV --> UC
+  UC --> ENT
+  UC --> RULES
+  UC --- PORTS_OUT
+  PORTS_OUT -->|"persistencia"| REPOS -->|"MongoDriver/TLS"| DB
+  PORTS_OUT -->|"transacciones"| UOW --> REPOS
+  PORTS_OUT -->|"cobros/refundos/webhooks (confirmEvent)"| PAY_AD -->|"API + webhooks"| PAY
+  PORTS_OUT -->|"envíos de mensaje"| NOT_AD --->|"API externa"| NOT
+  PORTS_OUT -->|"crear usuario / asegurar rol"| ID_AD -->|"Admin REST"| KC
+  HTTP -->|"verifica token (JWT/JWKS)"| VERIF["KeycloakVerifier"]
+  VERIF --> KC
