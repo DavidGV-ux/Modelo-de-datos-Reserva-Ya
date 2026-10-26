@@ -1,0 +1,31 @@
+%% ============================================================
+%% ReservaYa - Secuencia: webhook de pago (exterior -> núcleo -> DB)
+%% Abrir en: https://mermaid.live
+%% ============================================================
+
+sequenceDiagram
+  autonumber
+  participant P as Proveedor<br/>(wompi/payu/mock)
+  participant R as Adapter REST<br/>(routes/webhooks)
+  participant UC as PaymentsUseCases<br/>(aplicación)
+  participant GW as Payment adapter<br/>(confirmEvent)
+  participant RE as Reglas de dominio<br/>(payments-rules)
+  participant U as MongoUnitOfWork<br/>+ repos (tx)
+
+  P->>R: POST /api/webhooks/payments<br/>(payload firmado del proveedor)
+  Note over R: middleware auth opcional / captura rawEvent
+  R->>UC: services.payments.processWebhook({ rawEvent, tenantId })
+
+  Note over GW: el adapter verifica la firma del proveedor<br/>y normaliza: operation · status · internalReference
+  UC->>GW: gateway.confirmEvent(rawEvent)
+
+  UC->>U: uow.withTransaction( fn )
+  U->>U: findByProviderEvent(provider, eventId) → dedupe
+  U->>U: findByInternalReference(tenantId, internalReference)
+  U->>U: updateStatus(tx → approved)
+  U->>U: updateStatus(appointment → confirmed / approved)
+  UC->>RE: buildLedgerForApprovedCharge(…)
+  UC->>U: ledger.create(2 entradas: commission + tenant_balance)
+  U-->>UC: commit
+  UC-->>R: { handled: true }
+  R-->>P: 200 OK

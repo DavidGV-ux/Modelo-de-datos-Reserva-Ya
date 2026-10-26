@@ -1,0 +1,43 @@
+@use '@angular/material' as mat;
+
+$ry-primary: mat.$green-palette;
+$ry-tertiary: mat.$cyan-palette;
+
+html {
+  color-scheme: light;
+  @include mat.theme(
+    (
+      color: (
+        primary: $ry-primary,
+        tertiary: $ry-tertiary,
+        theme-type: light,
+      ),
+      typography: Roboto,
+      density: 0,
+    )
+  );
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: Roboto, 'Helvetica Neue', sans-serif;
+  background-color: var(--mat-sys-surface);
+  color: var(--mat-sys-on-surface);
+}
+
+.mat-mdc-snack-bar-container {
+  &.app-success {
+    --mdc-snackbar-container-color: var(--mat-sys-primary);
+    --mat-snack-bar-button-color: #fff;
+  }
+
+  &.app-error {
+    --mdc-snackbar-container-color: var(--mat-sys-error);
+    --mat-snack-bar-button-color: #fff;
+  }
+}
