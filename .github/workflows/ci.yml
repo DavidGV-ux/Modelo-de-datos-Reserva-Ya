@@ -1,0 +1,43 @@
+name: CI
+
+# Se ejecuta cuando alguien sube cambios a main o abre/actualiza un Pull Request.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# El workflow solo necesita leer el código.
+permissions:
+  contents: read
+
+jobs:
+  validar:
+    name: validar
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    # Todos los comandos se ejecutan dentro del backend.
+    defaults:
+      run:
+        working-directory: Codigo/Back
+
+    steps:
+      - name: Descargar el código
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: Codigo/Back/package-lock.json
+
+      - name: Instalar dependencias
+        run: npm ci
+
+      - name: Compilar y verificar tipos
+        run: npm run build
+
+      - name: Ejecutar pruebas unitarias
+        run: npx vitest run test/unit
