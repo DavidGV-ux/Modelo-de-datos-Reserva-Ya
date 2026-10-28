@@ -91,25 +91,42 @@ function buildServiceMenu(list) {
 
 function buildProfessionalMenu(list) {
   const lines = list.map((p, i) => `${i + 1}. *${p.name}*${p.title ? ` — ${p.title}` : ''}`);
-  return `*¿Con quién agendar?* 🧑‍🔬\n\n${lines.join('\n')}\n\nElige el número del profesional (o *0* para volver).`;
+  return `*¿Con quién agendar?* 🧑‍🔬\n\n${lines.join('\n')}\n\n` +
+    `Elige el número, escribe el nombre o di *"cualquiera"* (o *0* para volver).`;
 }
 
-function buildDayMenu(days) {
-  const now = new Date();
-  const fmt = new Intl.DateTimeFormat('es-CO', { weekday: 'long', day: 'numeric', month: 'long' });
+function buildDayMenu(days, timezone) {
+  const fmt = new Intl.DateTimeFormat('es-CO', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
+  const today = Utils.todayInZone(timezone);
   const lines = days.map((d, i) => {
-    const label = fmt.format(new Date(`${d}T12:00:00`));
-    return `${i + 1}. ${label}${i === 0 ? ' (mañana)' : ''}`;
+    const label = fmt.format(new Date(`${d}T12:00:00Z`));
+    const suffix = d === today ? ' (hoy)' : d === addOneDay(today) ? ' (mañana)' : '';
+    return `${i + 1}. ${label}${suffix}`;
   });
-  return `*Elige el día* 📅\n\n${lines.join('\n')}\n\nEscribe el número del día (o *0* para volver).`;
+  return `*Elige el día* 📅\n\n${lines.join('\n')}\n\n` +
+    `Escribe el número o el día (ej. *mañana*, *el viernes*, *12/11*).`;
 }
 
-function buildSlotMenu(slots) {
-  const fmt = new Intl.DateTimeFormat('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true });
-  const lines = slots
+function addOneDay(dateStr) {
+  const [y, m, d] = String(dateStr).split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d + 1, 12));
+  return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, '0')}-${String(dt.getUTCDate()).padStart(2, '0')}`;
+}
+
+function buildSlotMenu(slots, timezone) {
+  const fmt = new Intl.DateTimeFormat('es-CO', {
+    timeZone: timezone || 'America/Bogota',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true,
+  });
+  const visible = slots
     .filter((s) => s.available && !s.blocked)
-    .map((s, i) => `${i + 1}. ${fmt.format(new Date(s.start))}`);
-  return `*Elige la hora* 🕐\n\n${lines.join('\n')}\n\nEscribe el número de la hora (o *0* para volver).`;
+    .slice(0, 18);
+  const lines = visible.map((s, i) => `${i + 1}. ${fmt.format(new Date(s.start))}`);
+  const extra = slots.filter((s) => s.available && !s.blocked).length - visible.length;
+  return `*Elige la hora* 🕐\n\n${lines.join('\n')}${extra > 0 ? `\n… y ${extra} más` : ''}\n\n` +
+    `Escribe el número, o dime la hora como quieras: *"3:30 pm"*, *"a las 12 y media"*, *"1530"*.`;
 }
 
 function slotsInTimezone(slots, timezone) {

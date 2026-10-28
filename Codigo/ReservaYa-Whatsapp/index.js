@@ -158,7 +158,9 @@ app.post('/internal/events', async (req, res) => {
       return res.status(200).send('ok');
     } catch (err) {
       Utils.log('error', `user.invite: ${err.message}`);
-      return res.status(200).send('accepted');
+      // 502 para que el Back no marque inviteSentAt y reintente en el próximo
+      // guardado del perfil si Meta rechazó el mensaje (p. ej. falta plantilla).
+      return res.status(502).send('invite failed');
     }
   }
 
