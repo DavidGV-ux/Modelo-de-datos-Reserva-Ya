@@ -22,10 +22,15 @@ class WhatsAppService {
     return data;
   }
 
-  // La Cloud API espera E.164 sin '+'; normalizamos a solo dígitos.
+  // La Cloud API espera E.164 sin '+'. Si llega un número local de 10 dígitos
+  // asumimos Colombia (+57); si ya viene con prefijo internacional, se respeta.
   sanitizeTo(to) {
-    const digits = String(to ?? '').replace(/\D/g, '');
-    return digits.startsWith('57') && digits.length === 12 ? digits : `57${digits.slice(-10)}`;
+    let digits = String(to ?? '').replace(/\D/g, '');
+    if (!digits) return '';
+    if (digits.startsWith('00')) digits = digits.slice(2);
+    if (digits.length === 11 && digits.startsWith('0')) return `57${digits.slice(1)}`;
+    if (digits.length === 10) return `57${digits}`;
+    return digits;
   }
 
   async sendMessage(to, message) {
@@ -40,7 +45,7 @@ class WhatsAppService {
     return this.post('/messages', {
       messaging_product: 'whatsapp',
       recipient_type: 'individual',
-      to,
+      to: this.sanitizeTo(to),
       type: 'interactive',
       interactive: {
         type: 'button',
@@ -79,7 +84,7 @@ class WhatsAppService {
 
   async markRead(to) {
     try {
-      await this.post('/messages', { messaging_product: 'whatsapp', status: 'read', message_id: '', to });
+      await this.post('/messages', { messaging_product: 'whatsapp', status: 'read', message_id: '', to: this.sanitizeTo(to) });
     } catch {
       // El marcado de leído es best-effort
     }

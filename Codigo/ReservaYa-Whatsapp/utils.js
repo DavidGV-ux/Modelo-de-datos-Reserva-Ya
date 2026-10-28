@@ -186,6 +186,91 @@ class Utils {
     return formatter.format(date);
   }
 
+  // Solo la hora local del negocio: "3:30 p. m.".
+  static formatTimeLocal(isoStart, timezone) {
+    const date = new Date(isoStart);
+    const formatter = new Intl.DateTimeFormat('es-CO', {
+      timeZone: timezone || 'America/Bogota',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    });
+    return formatter.format(date);
+  }
+
+  // Fecha local (YYYY-MM-DD) del negocio para un instante ISO.
+  static localDate(isoStart, timezone) {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone || 'America/Bogota',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).formatToParts(new Date(isoStart));
+    const get = (type) => parts.find((p) => p.type === type)?.value;
+    return `${get('year')}-${get('month')}-${get('day')}`;
+  }
+
+  // Minutos desde la medianoche local del negocio (0-1439).
+  static localMinutes(isoStart, timezone) {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone || 'America/Bogota',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    }).formatToParts(new Date(isoStart));
+    const get = (type) => parts.find((p) => p.type === type)?.value;
+    return Number(get('hour')) * 60 + Number(get('minute'));
+  }
+
+  static todayInZone(timezone, now = new Date()) {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone || 'America/Bogota',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).formatToParts(now);
+    const get = (type) => parts.find((p) => p.type === type)?.value;
+    return `${get('year')}-${get('month')}-${get('day')}`;
+  }
+
+  static addDays(dateStr, days) {
+    const [y, m, d] = String(dateStr).split('-').map(Number);
+    const dt = new Date(Date.UTC(y, m - 1, d + days, 12));
+    return `${dt.getUTCFullYear()}-${String(dt.getUTCMonth() + 1).padStart(2, '0')}-${String(dt.getUTCDate()).padStart(2, '0')}`;
+  }
+
+  // "2026-10-30" -> "viernes 30 de octubre".
+  static formatDayLabel(dateStr) {
+    const [y, m, d] = String(dateStr).split('-').map(Number);
+    const formatter = new Intl.DateTimeFormat('es-CO', {
+      timeZone: 'UTC',
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+    });
+    return formatter.format(new Date(Date.UTC(y, m - 1, d, 12)));
+  }
+
+  // Minutos -> "3:30 p. m.".
+  static formatMinutes(minutes) {
+    const total = ((Number(minutes) % 1440) + 1440) % 1440;
+    const h24 = Math.floor(total / 60);
+    const m = total % 60;
+    const suffix = h24 < 12 ? 'a. m.' : 'p. m.';
+    const h12 = h24 % 12 || 12;
+    return `${h12}:${String(m).padStart(2, '0')} ${suffix}`;
+  }
+
+  // "9:00" -> 540.
+  static minutesFromClock(clock) {
+    const match = /^(\d{1,2}):(\d{2})$/.exec(String(clock ?? '').trim());
+    if (!match) return null;
+    const h = Number(match[1]);
+    const m = Number(match[2]);
+    if (h < 0 || h > 23 || m < 0 || m > 59) return null;
+    return h * 60 + m;
+  }
+
   static parseCategoryFromText(text) {
     const map = [
       { re: /peluquer|barber|corte|uña|manicur|estilist|beauty/i, category: 'beauty' },

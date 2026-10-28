@@ -7,6 +7,8 @@ const roleService = require('./roleService');
 const groqService = require('./groqService');
 const whatsappService = require('./whatsappService');
 const menu = require('./menuService');
+const advisor = require('./availabilityAdvisor');
+const { parseTimeRequest, parseDayRequest, todayInZone } = require('./timeParser');
 const { welcomeByRole } = require('./welcomeService');
 
 const norm = (s) => String(s ?? '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
@@ -224,6 +226,10 @@ class Orchestrator {
         return this.#dayStep(conv, ctx, text);
       case 'slot':
         return this.#slotStep(conv, ctx, text);
+      case 'time_meridiem':
+        return this.#timeMeridiemStep(conv, ctx, text);
+      case 'time_choice':
+        return this.#timeChoiceStep(conv, ctx, text);
       case 'confirm':
         return this.#confirmStep(conv, ctx, text, messageId);
       case 'pay':
@@ -416,7 +422,15 @@ class Orchestrator {
     const biz = list[idx];
     try {
       const full = await reservaYaApi.getTenantBySlug(biz.slug);
-      ctx.tenant = { tenantId: full.tenantId, slug: full.slug, name: full.name, timezone: full.timezone };
+      ctx.tenant = {
+        tenantId: full.tenantId,
+        slug: full.slug,
+        name: full.name,
+        timezone: full.timezone,
+        category: full.category,
+        currency: full.currency,
+        settings: full.settings || {},
+      };
       const services = await reservaYaApi.getServices(full.tenantId);
       let sList = services.filter((s) => s.active);
       if (ctx.maxPrice) sList = sList.filter((s) => s.price <= ctx.maxPrice);
@@ -472,26 +486,74 @@ class Orchestrator {
   async #professionalStep(conv, ctx, text) {
     const pros = ctx.current?.professionals || [];
     const idx = menu.pickIndex(text, pros.length);
-    if (idx == null) {
-      await whatsappService.sendMessage(conv.waId, menu.buildProfessionalMenu(pros));
-      return;
+    if (idx != null) {
+      ctx.current.professional = pros[idx];
+      ctx.current.anyProfessional = false;
+      return this.#loadDays(conv, ctx);
     }
-    ctx.current.professional = pros[idx];
-    await this.#loadDays(conv, ctx);
+    const n = norm(text);
+    if (/^(cualquiera|me da igual|el que sea|quien sea|disponible|el primero|random|lo que sea)$/.test(n)) {
+      ctx.current.professional = null;
+      ctx.current.anyProfessional = true;
+      return this.#loadDays(conv, ctx);
+    }
+    const matches = advisor.matchProfessionals(pros, text);
+    if (matches.length === 1) {
+      ctx.current.professional = matches[0];
+      ctx.current.anyProfessional = false;
+      return this.#loadDays(conv, ctx);
+    }
+    await whatsappService.sendMessage(
+      conv.waId,
+      `${matches.length > 1 ? 'Tengo varios profesionales con ese nombre. ' : ''}${menu.buildProfessionalMenu(pros)}`,
+    );
+  }
+
+  #professionalsFor(ctx) {
+    const all = ctx.current?.professionals || [];
+    if (ctx.current?.professional) return [ctx.current.professional];
+    return all;
+  }
+
+  #resolveProfessional(ctx, id) {
+    const all = ctx.current?.professionals || [];
+    if (id) {
+      const found = all.find((p) => p.id === id);
+      if (found) return found;
+    }
+    return ctx.current?.professional || all[0] || null;
   }
 
   async #loadDays(conv, ctx) {
     try {
-      const days = await reservaYaApi.getAvailabilityDays(ctx.tenant.tenantId, [ctx.current.professional.id], 14);
-      ctx.dayList = days;
+      const pros = this.#professionalsFor(ctx);
+      const days = await reservaYaApi.getAvailabilityDays(
+        ctx.tenant.tenantId,
+        pros.map((p) => p.id),
+        14,
+      );
+      ctx.dayList = Array.isArray(days) ? days : [];
       ctx.flow = 'day';
+      delete ctx.dayAvailability;
+      delete ctx.slotList;
+      delete ctx.pendingTime;
+      delete ctx.suggestion;
+      delete ctx.lastUnavailable;
       await dbService.upsertConversation(conv.phone, { context: ctx });
-      if (days.length === 0) {
-        await whatsappService.sendMessage(conv.waId, 'Este profesional no tiene turnos en los próximos días. Elige otro. 😕');
-        await whatsappService.sendMessage(conv.waId, menu.buildProfessionalMenu(ctx.current.professionals));
+      if (ctx.dayList.length === 0) {
+        await whatsappService.sendMessage(
+          conv.waId,
+          'No encontré turnos en los próximos días para esa selección. 😕' +
+            (ctx.current?.professional ? '\nPuedes elegir otro profesional escribiendo *profesional*.' : ''),
+        );
+        if ((ctx.current?.professionals || []).length > 1) {
+          ctx.flow = 'professional';
+          await dbService.upsertConversation(conv.phone, { context: ctx });
+          await whatsappService.sendMessage(conv.waId, menu.buildProfessionalMenu(ctx.current.professionals));
+        }
         return;
       }
-      await whatsappService.sendMessage(conv.waId, menu.buildDayMenu(days));
+      await whatsappService.sendMessage(conv.waId, menu.buildDayMenu(ctx.dayList, ctx.tenant.timezone));
     } catch (err) {
       Utils.log('warn', `loadDays: ${err.message}`);
       await whatsappService.sendMessage(conv.waId, 'No pudimos cargar la disponibilidad. Intenta de nuevo. 🙁');
@@ -500,49 +562,657 @@ class Orchestrator {
 
   async #dayStep(conv, ctx, text) {
     const days = ctx.dayList || [];
+    const timeReq = parseTimeRequest(text, { context: 'day' });
+    const today = todayInZone(ctx.tenant.timezone);
+    const dayReq = parseDayRequest(text, { today });
     const idx = menu.pickIndex(text, days.length);
-    if (idx == null) {
-      await whatsappService.sendMessage(conv.waId, menu.buildDayMenu(days));
+
+    let chosen = null;
+    if (idx != null) chosen = days[idx];
+    else if (dayReq) chosen = dayReq.date;
+    else if (timeReq.kind !== 'none' && days.length) chosen = days[0];
+
+    if (!chosen) {
+      await whatsappService.sendMessage(conv.waId, menu.buildDayMenu(days, ctx.tenant.timezone));
       return;
     }
-    try {
-      const slots = await reservaYaApi.getSlots(ctx.tenant.tenantId, {
-        professionalId: ctx.current.professional.id,
-        date: days[idx],
+
+    // Si el día pedido no está en la lista (día cerrado o fuera de ventana),
+    // igual intentamos consultar sus horas; si no hay, ofrecemos el siguiente.
+    const loaded = await this.#loadSlotsForDay(
+      conv,
+      ctx,
+      chosen,
+      timeReq.kind !== 'none' ? timeReq : null,
+    );
+    if (!loaded) {
+      const next = await advisor.nextAvailableDay({
+        tenant: ctx.tenant,
+        professionals: ctx.current.professionals || [],
+        afterDate: Utils.addDays(chosen, -1),
         durationMinutes: ctx.current.durationMinutes,
+        targetMinutes: timeReq.kind === 'exact' ? (timeReq.hour * 60 + timeReq.minute) : 9 * 60,
       });
-      ctx.slotList = slots.filter((s) => s.available && !s.blocked);
-      ctx.current.day = days[idx];
-      ctx.flow = 'slot';
-      await dbService.upsertConversation(conv.phone, { context: ctx });
-      if (ctx.slotList.length === 0) {
-        await whatsappService.sendMessage(conv.waId, 'No hay horarios disponibles ese día. Elige otro. 📅');
-        await whatsappService.sendMessage(conv.waId, menu.buildDayMenu(days));
+      if (!next) {
+        await whatsappService.sendMessage(
+          conv.waId,
+          'No encontré disponibilidad en los próximos días. 😔 Prueba con otro servicio u otro negocio.',
+        );
+        await dbService.clearContext(conv.phone);
         return;
       }
-      await whatsappService.sendMessage(conv.waId, menu.buildSlotMenu(ctx.slotList));
+      ctx.suggestion = this.#suggestionFromNextDay(ctx, next);
+      ctx.flow = 'time_choice';
+      await dbService.upsertConversation(conv.phone, { context: ctx });
+      await whatsappService.sendMessage(
+        conv.waId,
+        `Ese día no hay cupo. La opción más cercana es *${Utils.formatDayLabel(next.date)}* a las *${Utils.formatTimeLocal(next.slot.start, ctx.tenant.timezone)}*. ¿Te sirve?`,
+      );
+      return whatsappService.sendButtons(conv.waId, '¿Reservamos esa opción?', [
+        { id: 'time:nextday', title: '✅ Sí, esa' },
+        { id: 'time:other', title: '🕐 Otra hora' },
+      ]);
+    }
+  }
+
+  /**
+   * Carga las horas de un día. Devuelve true si encontró al menos una.
+   * Si `timeReq` viene, intenta resolverla directamente.
+   */
+  async #loadSlotsForDay(conv, ctx, date, timeReq = null, preselectStart = null) {
+    try {
+      const pros = ctx.current.professionals || [];
+      const availability = await advisor.loadAvailability({
+        tenant: ctx.tenant,
+        professionals: pros,
+        date,
+        durationMinutes: ctx.current.durationMinutes,
+      });
+      ctx.dayAvailability = {
+        date,
+        timezone: availability.timezone,
+        policy: availability.policy,
+        merged: availability.merged,
+        available: availability.available,
+      };
+      const chosen = ctx.current.professional;
+      const visible = availability.available.filter(
+        (e) => !chosen || e.professionalIds.includes(chosen.id),
+      );
+      ctx.current.day = date;
+      ctx.slotList = visible.map((e) => ({
+        start: e.start,
+        end: e.end,
+        available: true,
+        blocked: false,
+        professionalIds: e.professionalIds,
+        professionalNames: e.professionalNames,
+        timezone: e.timezone,
+      }));
+      ctx.allSlots = ctx.slotList;
+      ctx.flow = 'slot';
+      delete ctx.pendingTime;
+      delete ctx.suggestion;
+      await dbService.upsertConversation(conv.phone, { context: ctx });
+
+      if (preselectStart) {
+        const entry = availability.available.find((e) => e.start === preselectStart);
+        if (entry) {
+          await this.#selectSlot(conv, ctx, entry);
+          return true;
+        }
+      }
+
+      if (ctx.slotList.length === 0) {
+        // El profesional elegido no tiene cupo, pero otro sí: ofrecerlo.
+        if (chosen && availability.available.length > 0) {
+          const first = availability.available[0];
+          const otherId = first.professionalIds.find((id) => id !== chosen.id) || first.professionalIds[0];
+          const other = this.#resolveProfessional(ctx, otherId);
+          ctx.suggestion = {
+            type: 'other_professional',
+            start: first.start,
+            date,
+            professionalId: other?.id || otherId,
+            reason: 'other_professional',
+          };
+          ctx.flow = 'time_choice';
+          await dbService.upsertConversation(conv.phone, { context: ctx });
+          await whatsappService.sendMessage(
+            conv.waId,
+            `*${chosen.name}* no tiene cupo el ${Utils.formatDayLabel(date)}. 😕\n` +
+              `Pero *${other?.name || 'otro profesional'}* sí tiene a las *${Utils.formatTimeLocal(first.start, ctx.tenant.timezone)}*. ¿Quieres agendar con esa persona?`,
+          );
+          return whatsappService.sendButtons(conv.waId, '¿Con otro profesional?', [
+            { id: 'time:otherpro', title: '✅ Sí, con esa' },
+            { id: 'time:other', title: '🕐 Otra hora' },
+          ]);
+        }
+        await whatsappService.sendMessage(
+          conv.waId,
+          `No hay horarios disponibles el ${Utils.formatDayLabel(date)}. 📅`,
+        );
+        return false;
+      }
+
+      if (timeReq) {
+        ctx.flow = 'slot';
+        await this.#handleTimeRequest(conv, ctx, timeReq);
+        return true;
+      }
+      await whatsappService.sendMessage(
+        conv.waId,
+        menu.buildSlotMenu(ctx.slotList, ctx.tenant.timezone),
+      );
+      return true;
     } catch (err) {
-      Utils.log('warn', `dayStep: ${err.message}`);
+      Utils.log('warn', `loadSlotsForDay ${date}: ${err.message}`);
       await whatsappService.sendMessage(conv.waId, 'No pudimos ver los horarios. Intenta de nuevo. 🙁');
+      return false;
     }
   }
 
   async #slotStep(conv, ctx, text) {
     const slots = ctx.slotList || [];
-    const idx = menu.pickIndex(text, slots.length);
-    if (idx == null) {
-      await whatsappService.sendMessage(conv.waId, menu.buildSlotMenu(slots));
+    const clean = String(text ?? '').trim();
+    const n = norm(clean);
+
+    if (/^(otro dia|otra fecha|siguiente dia|manana|pasado manana|el viernes|el lunes|el martes|el miercoles|el jueves|el sabado|el domingo)$/.test(n)) {
+      const dayReq = parseDayRequest(clean, { today: todayInZone(ctx.tenant.timezone) });
+      if (dayReq) {
+        ctx.flow = 'day';
+        await dbService.upsertConversation(conv.phone, { context: ctx });
+        return this.#dayStep(conv, ctx, clean);
+      }
+    }
+    if (/^(cualquiera|la primera|lo que sea|el primero|la mas pronto|lo mas pronto|disponible)$/.test(n) && slots.length) {
+      return this.#selectSlot(conv, ctx, slots[0]);
+    }
+    if (/^(otro profesional|cambiar profesional|profesional)$/.test(n)) {
+      ctx.flow = 'professional';
+      await dbService.upsertConversation(conv.phone, { context: ctx });
+      return whatsappService.sendMessage(conv.waId, menu.buildProfessionalMenu(ctx.current.professionals || []));
+    }
+
+    const idx = menu.pickIndex(clean, slots.length);
+    if (idx != null) {
+      // Un número dentro del menú se interpreta como opción. Para una hora
+      // escrita (ej. "3 pm") el usuario debe incluir el meridiem.
+      return this.#selectSlot(conv, ctx, slots[idx]);
+    }
+
+    const timeReq = parseTimeRequest(clean, { context: 'slot' });
+    if (timeReq.kind !== 'none') {
+      return this.#handleTimeRequest(conv, ctx, timeReq);
+    }
+    await whatsappService.sendMessage(
+      conv.waId,
+      menu.buildSlotMenu(slots, ctx.tenant.timezone),
+    );
+  }
+
+  async #timeMeridiemStep(conv, ctx, text) {
+    const pending = ctx.pendingTime;
+    if (!pending) {
+      ctx.flow = 'slot';
+      await dbService.upsertConversation(conv.phone, { context: ctx });
+      return this.#slotStep(conv, ctx, text);
+    }
+    const n = norm(text);
+
+    // Rango pendiente: "de 3 a 5" -> ¿mañana o tarde?
+    if (pending.kind === 'range') {
+      const mer = text === 'time:range_pm' || /\b(pm|tarde|noche)\b/.test(n)
+        ? 'pm'
+        : text === 'time:range_am' || /\b(am|manana|madrugada)\b/.test(n)
+          ? 'am'
+          : null;
+      if (!mer) {
+        if (text === 'time:other' || /^(otra|otra hora|cambiar|no|mejor no)$/.test(n)) {
+          ctx.flow = 'slot';
+          delete ctx.pendingTime;
+          await dbService.upsertConversation(conv.phone, { context: ctx });
+          return whatsappService.sendMessage(conv.waId, menu.buildSlotMenu(this.#fullSlots(ctx), ctx.tenant.timezone));
+        }
+        return whatsappService.sendButtons(conv.waId, '¿Ese rango es de la mañana o de la tarde? 🌅🌇', [
+          { id: 'time:range_am', title: '🌅 Mañana' },
+          { id: 'time:range_pm', title: '🌇 Tarde' },
+          { id: 'time:other', title: '🕐 Otra hora' },
+        ]);
+      }
+      const fix = (endpoint) => {
+        if (!endpoint || endpoint.kind === 'exact') return endpoint;
+        const hour = endpoint.candidates.find((h) => (mer === 'pm' ? h >= 12 : h < 12));
+        return { ...endpoint, kind: 'exact', hour, meridiem: mer };
+      };
+      let from = fix(pending.from);
+      const to = fix(pending.to);
+      // "de 11 a 1" + tarde = 11:00 a. m. a 1:00 p. m., no 11:00 p. m. a 1:00 p. m.
+      if (mer === 'pm' && from.kind === 'exact' && to.kind === 'exact'
+        && from.hour >= 12 && to.hour >= 12 && from.hour > to.hour) {
+        const amStart = (pending.from.candidates || []).find((h) => h < 12);
+        if (amStart != null) from = { ...from, hour: amStart, meridiem: 'am' };
+      }
+      ctx.flow = 'slot';
+      delete ctx.pendingTime;
+      await dbService.upsertConversation(conv.phone, { context: ctx });
+      return this.#handleRangeRequest(conv, ctx, { from, to, text: pending.text });
+    }
+
+    let hour24 = null;
+    if (text === 'time:pm') {
+      hour24 = pending.candidates.find((h) => h >= 12);
+    } else if (text === 'time:am') {
+      hour24 = pending.candidates.find((h) => h < 12);
+    } else if (/\b(pm|tarde|noche)\b/.test(n)) {
+      hour24 = pending.candidates.find((h) => h >= 12);
+    } else if (/\b(am|manana|madrugada)\b/.test(n)) {
+      hour24 = pending.candidates.find((h) => h < 12);
+    }
+
+    if (hour24 == null) {
+      if (text === 'time:other' || /^(otra|otra hora|cambiar|no|mejor no)$/.test(n)) {
+        ctx.flow = 'slot';
+        delete ctx.pendingTime;
+        await dbService.upsertConversation(conv.phone, { context: ctx });
+        return whatsappService.sendMessage(conv.waId, menu.buildSlotMenu(this.#fullSlots(ctx), ctx.tenant.timezone));
+      }
+      const otherTime = parseTimeRequest(text, { context: 'slot' });
+      if (otherTime.kind !== 'none') {
+        ctx.flow = 'slot';
+        delete ctx.pendingTime;
+        await dbService.upsertConversation(conv.phone, { context: ctx });
+        return this.#handleTimeRequest(conv, ctx, otherTime);
+      }
+      return whatsappService.sendButtons(conv.waId, '¿Es de mañana o de la tarde?', this.#meridiemButtons(ctx));
+    }
+
+    const minute = pending.minute || 0;
+    ctx.flow = 'slot';
+    delete ctx.pendingTime;
+    await dbService.upsertConversation(conv.phone, { context: ctx });
+    return this.#handleExactRequest(conv, ctx, hour24, minute, pending.text);
+  }
+
+  #fullSlots(ctx) {
+    return Array.isArray(ctx.allSlots) && ctx.allSlots.length ? ctx.allSlots : (ctx.slotList || []);
+  }
+
+  #meridiemButtons(ctx) {
+    const pending = ctx.pendingTime;
+    if (!pending) return [];
+    const minute = pending.minute || 0;
+    const candidates = pending.candidates || [];
+    const am = candidates.find((h) => h < 12);
+    const pm = candidates.find((h) => h >= 12);
+    const buttons = [];
+    if (am != null) buttons.push({ id: 'time:am', title: `🌅 ${Utils.formatMinutes(am * 60 + minute)}`.slice(0, 20) });
+    if (pm != null) buttons.push({ id: 'time:pm', title: `🌇 ${Utils.formatMinutes(pm * 60 + minute)}`.slice(0, 20) });
+    if (buttons.length < 3) buttons.push({ id: 'time:other', title: '🕐 Otra hora' });
+    return buttons;
+  }
+
+  async #handleTimeRequest(conv, ctx, timeReq) {
+    if (timeReq.kind === 'range') {
+      return this.#handleRangeRequest(conv, ctx, timeReq);
+    }
+    if (timeReq.kind === 'ambiguous') {
+      ctx.pendingTime = {
+        kind: 'exact',
+        minute: timeReq.minute || 0,
+        candidates: timeReq.candidates || [],
+        day: ctx.current.day,
+        text: timeReq.text || '',
+        modifier: timeReq.modifier || null,
+      };
+      ctx.flow = 'time_meridiem';
+      await dbService.upsertConversation(conv.phone, { context: ctx });
+      const minute = timeReq.minute || 0;
+      const labels = (timeReq.candidates || []).map((h) => Utils.formatMinutes(h * 60 + minute));
+      return whatsappService.sendButtons(
+        conv.waId,
+        `Para no equivocarme con tu reserva: ¿te refieres a las *${labels[0]}* o a las *${labels[1]}*? 🤔`,
+        this.#meridiemButtons(ctx),
+      );
+    }
+    if (timeReq.kind === 'invalid') {
+      await whatsappService.sendMessage(
+        conv.waId,
+        'Esa hora no existe o no es válida. 🙁 Usa una hora entre *00:00* y *23:59*, por ejemplo *3:30 pm* o *1530*.',
+      );
+      return whatsappService.sendMessage(
+        conv.waId,
+        menu.buildSlotMenu(ctx.slotList || [], ctx.tenant.timezone),
+      );
+    }
+    if (timeReq.kind === 'exact') {
+      const hour = timeReq.hour;
+      const minute = timeReq.minute;
+      const modifier = timeReq.modifier;
+      if (modifier === 'before' || modifier === 'after') {
+        return this.#handleRelativeRequest(conv, ctx, hour * 60 + minute, modifier);
+      }
+      return this.#handleExactRequest(conv, ctx, hour, minute, timeReq.text);
+    }
+    await whatsappService.sendMessage(
+      conv.waId,
+      menu.buildSlotMenu(ctx.slotList || [], ctx.tenant.timezone),
+    );
+  }
+
+  async #handleRangeRequest(conv, ctx, timeReq) {
+    const { from, to } = timeReq;
+    if (from.ambiguous || to.ambiguous) {
+      ctx.pendingTime = {
+        kind: 'range',
+        from,
+        to,
+        text: timeReq.text,
+      };
+      ctx.flow = 'time_meridiem';
+      await dbService.upsertConversation(conv.phone, { context: ctx });
+      return whatsappService.sendButtons(
+        conv.waId,
+        '¿Ese rango es de la mañana o de la tarde? 🌅🌇',
+        [
+          { id: 'time:range_am', title: '🌅 Mañana' },
+          { id: 'time:range_pm', title: '🌇 Tarde' },
+          { id: 'time:other', title: '🕐 Otra hora' },
+        ],
+      );
+    }
+    const startMin = from.hour * 60 + from.minute;
+    const endMin = to.hour * 60 + to.minute;
+    const inside = (ctx.slotList || []).filter((s) => {
+      const m = Utils.localMinutes(s.start, ctx.tenant.timezone);
+      return m >= startMin && m < endMin;
+    });
+    if (inside.length) {
+      ctx.allSlots = ctx.allSlots || ctx.slotList;
+      ctx.slotList = inside;
+      ctx.flow = 'slot';
+      await dbService.upsertConversation(conv.phone, { context: ctx });
+      return whatsappService.sendMessage(
+        conv.waId,
+        `Estas son las horas disponibles entre *${Utils.formatMinutes(startMin)}* y *${Utils.formatMinutes(endMin)}*:\n\n` +
+          `${menu.buildSlotMenu(inside, ctx.tenant.timezone)}`,
+      );
+    }
+    const target = startMin;
+    return this.#handleExactRequest(conv, ctx, Math.floor(target / 60), target % 60, timeReq.text);
+  }
+
+  async #handleRelativeRequest(conv, ctx, targetMinutes, modifier) {
+    const candidates = (ctx.slotList || [])
+      .map((s) => ({ s, m: Utils.localMinutes(s.start, ctx.tenant.timezone) }))
+      .filter(({ m }) => (modifier === 'before' ? m < targetMinutes : m > targetMinutes))
+      .sort((a, b) => (modifier === 'before' ? b.m - a.m : a.m - b.m));
+    if (candidates.length) {
+      return this.#selectSlot(conv, ctx, candidates[0].s);
+    }
+    return this.#handleExactRequest(conv, ctx, Math.floor(targetMinutes / 60), targetMinutes % 60, `${modifier} ${targetMinutes}`);
+  }
+
+  async #handleExactRequest(conv, ctx, hour, minute, originalText) {
+    const target = hour * 60 + minute;
+    const entry = advisor.exactSlot(ctx.dayAvailability, target);
+    const chosen = ctx.current.professional;
+    const belongsToChosen = !chosen || (entry?.professionalIds || []).includes(chosen.id);
+    if (entry?.available && belongsToChosen) {
+      return this.#selectSlot(conv, ctx, entry);
+    }
+
+    const diagnosis = advisor.diagnose({
+      tenant: ctx.tenant,
+      professionals: ctx.current.professionals || [],
+      chosenProfessional: chosen,
+      date: ctx.current.day,
+      targetMinutes: target,
+      availability: ctx.dayAvailability,
+    });
+
+    // Si el problema es que el profesional elegido está ocupado pero otro
+    // tiene la misma hora, no hace falta buscar otro día.
+    if (!diagnosis.sameDay && !diagnosis.otherProfessionals.length) {
+      diagnosis.nextDay = await advisor.nextAvailableDay({
+        tenant: ctx.tenant,
+        professionals: ctx.current.professionals || [],
+        afterDate: ctx.current.day,
+        durationMinutes: ctx.current.durationMinutes,
+        targetMinutes: target,
+      });
+    }
+
+    const previous = ctx.lastUnavailable;
+    const insist = Boolean(
+      previous
+      && previous.minutes === target
+      && previous.day === ctx.current.day
+      && previous.attempts >= 1,
+    );
+    if (insist) {
+      diagnosis.insisted = true;
+      diagnosis.attempts = previous.attempts + 1;
+    }
+    ctx.lastUnavailable = {
+      minutes: target,
+      day: ctx.current.day,
+      text: String(originalText || ''),
+      attempts: insist ? previous.attempts + 1 : 1,
+    };
+
+    return this.#sendSuggestion(conv, ctx, diagnosis, originalText);
+  }
+
+  async #sendSuggestion(conv, ctx, diagnosis, originalText) {
+    const tz = ctx.tenant.timezone;
+    const proName = ctx.current.professional?.name || 'el profesional';
+    const requested = Utils.formatMinutes(diagnosis.targetMinutes);
+    const sameDay = diagnosis.sameDay;
+    const nextDay = diagnosis.nextDay;
+    const otherPros = (diagnosis.otherProfessionals || [])
+      .map((id) => (ctx.current.professionals || []).find((p) => p.id === id))
+      .filter(Boolean);
+    const otherPro = otherPros[0] || null;
+
+    let message = '';
+    if (diagnosis.reason === 'break') {
+      message =
+        `A las *${requested}* ${proName} está en su pausa de almuerzo ` +
+        `(${Utils.formatMinutes(diagnosis.breakWindow.start)} a ${Utils.formatMinutes(diagnosis.breakWindow.end)}). 😊\n`;
+    } else if (diagnosis.reason === 'before_open') {
+      message = `A las *${requested}* todavía no abren. El horario es ${diagnosis.scheduleText}. ⏰\n`;
+    } else if (diagnosis.reason === 'after_close') {
+      message = `A las *${requested}* ya cerraron. El horario es ${diagnosis.scheduleText}. 🌙\n`;
+    } else if (diagnosis.reason === 'day_off') {
+      message = `Ese día ${proName} no tiene atención. 📅\n`;
+    } else if (diagnosis.reason === 'outside') {
+      message = `A las *${requested}* no está dentro del horario de atención (${diagnosis.scheduleText}). ⏰\n`;
+    } else if (diagnosis.reason === 'full') {
+      message = `A las *${requested}* ya se completó el cupo disponible. 😕\n`;
+    } else {
+      message = `A las *${requested}* ${proName} ya tiene una cita. 😕\n`;
+    }
+
+    if (diagnosis.insisted) {
+      message =
+        `Entiendo que prefieres las *${requested}*, pero ese horario no está disponible y no puedo reservarlo. ` +
+        `Para cuidar tu agenda, te propongo una alternativa real. 🙏\n\n` + message;
+    }
+
+    if (otherPro && diagnosis.exact?.start) {
+      ctx.suggestion = {
+        type: 'other_professional',
+        start: diagnosis.exact.start,
+        date: diagnosis.date,
+        professionalId: otherPro.id,
+        reason: diagnosis.reason,
+      };
+      ctx.flow = 'time_choice';
+      await dbService.upsertConversation(conv.phone, { context: ctx });
+      message += `\n*${otherPro.name}* sí está disponible a esa hora. ¿Reservo contigo?`;
+      const buttons = [{ id: 'time:otherpro', title: `✅ Con ${otherPro.name}`.slice(0, 20) }];
+      if (sameDay && sameDay.start !== diagnosis.exact.start) {
+        buttons.push({ id: 'time:nearest', title: `🕐 ${Utils.formatTimeLocal(sameDay.start, tz)}`.slice(0, 20) });
+      }
+      buttons.push({ id: 'time:other', title: '🕐 Otra hora' });
+      return whatsappService.sendButtons(conv.waId, message, buttons.slice(0, 3));
+    }
+
+    if (sameDay) {
+      const proId = this.#pickSuggestionProfessional(ctx, sameDay);
+      ctx.suggestion = {
+        type: 'slot',
+        start: sameDay.start,
+        date: diagnosis.date,
+        professionalId: proId,
+        reason: diagnosis.reason,
+      };
+      ctx.flow = 'time_choice';
+      await dbService.upsertConversation(conv.phone, { context: ctx });
+      message += `La hora más cercana disponible es *${Utils.formatTimeLocal(sameDay.start, tz)}*. ¿Te sirve?`;
+      const buttons = [{ id: 'time:nearest', title: `✅ ${Utils.formatTimeLocal(sameDay.start, tz)}`.slice(0, 20) }];
+      if (nextDay?.slot) {
+        buttons.push({ id: 'time:nextday', title: `📅 ${Utils.formatDayLabel(nextDay.date).split(',')[0]}`.slice(0, 20) });
+      }
+      buttons.push({ id: 'time:other', title: '🕐 Otra hora' });
+      return whatsappService.sendButtons(conv.waId, message, buttons.slice(0, 3));
+    }
+
+    if (nextDay?.slot) {
+      ctx.suggestion = this.#suggestionFromNextDay(ctx, nextDay);
+      ctx.flow = 'time_choice';
+      await dbService.upsertConversation(conv.phone, { context: ctx });
+      message +=
+        `No queda cupo ese día. La opción más cercana es *${Utils.formatDayLabel(nextDay.date)}* ` +
+        `a las *${Utils.formatTimeLocal(nextDay.slot.start, tz)}*. ¿Te sirve?`;
+      return whatsappService.sendButtons(conv.waId, message, [
+        { id: 'time:nextday', title: '✅ Sí, esa' },
+        { id: 'time:other', title: '🕐 Otra hora' },
+      ]);
+    }
+
+    ctx.flow = 'time_choice';
+    delete ctx.suggestion;
+    await dbService.upsertConversation(conv.phone, { context: ctx });
+    message +=
+      'No encontré otra hora disponible ese día ni en los próximos días. 😔 ' +
+      'Puedes probar con otro profesional u otro servicio.';
+    return whatsappService.sendButtons(conv.waId, message, [
+      { id: 'time:other', title: '🕐 Otra hora' },
+      { id: 'menu', title: '🏠 Menú' },
+    ]);
+  }
+
+  #pickSuggestionProfessional(ctx, entry) {
+    const chosen = ctx.current?.professional;
+    if (chosen && (entry.professionalIds || []).includes(chosen.id)) return chosen.id;
+    return entry.professionalIds?.[0] || chosen?.id || null;
+  }
+
+  #suggestionFromNextDay(ctx, next) {
+    const entry = next.slot;
+    const proId = this.#pickSuggestionProfessional(ctx, entry);
+    return {
+      type: 'next_day',
+      start: entry.start,
+      date: next.date,
+      professionalId: proId,
+      reason: 'next_day',
+    };
+  }
+
+  async #timeChoiceStep(conv, ctx, text) {
+    const clean = String(text ?? '').trim();
+    const n = norm(clean);
+
+    if (clean === 'time:otherpro' || clean === 'time:nearest' || clean === 'time:anypro') {
+      return this.#acceptSuggestion(conv, ctx);
+    }
+    if (clean === 'time:nextday') {
+      return this.#acceptSuggestion(conv, ctx);
+    }
+    if (clean === 'time:other' || /^(otra|cambiar|no|mejor no|otra hora)$/.test(n)) {
+      ctx.flow = 'slot';
+      delete ctx.suggestion;
+      await dbService.upsertConversation(conv.phone, { context: ctx });
+      return whatsappService.sendMessage(
+        conv.waId,
+        menu.buildSlotMenu(this.#fullSlots(ctx), ctx.tenant.timezone),
+      );
+    }
+    if (/^(si|sí|dale|ok|okay|esa|acepto|confirmo|reserva|reservala|resérvala)$/.test(n)) {
+      return this.#acceptSuggestion(conv, ctx);
+    }
+
+    const timeReq = parseTimeRequest(clean, { context: 'slot' });
+    if (timeReq.kind !== 'none') {
+      ctx.flow = 'slot';
+      await dbService.upsertConversation(conv.phone, { context: ctx });
+      return this.#handleTimeRequest(conv, ctx, timeReq);
+    }
+    const dayReq = parseDayRequest(clean, { today: todayInZone(ctx.tenant.timezone) });
+    if (dayReq) {
+      ctx.flow = 'day';
+      await dbService.upsertConversation(conv.phone, { context: ctx });
+      return this.#dayStep(conv, ctx, clean);
+    }
+    await whatsappService.sendMessage(
+      conv.waId,
+      'Elige una de las opciones o dime otra hora (ej. *3:30 pm*, *mañana a las 10*). 🙂',
+    );
+  }
+
+  async #acceptSuggestion(conv, ctx) {
+    const suggestion = ctx.suggestion;
+    if (!suggestion) {
+      ctx.flow = 'slot';
+      await dbService.upsertConversation(conv.phone, { context: ctx });
+      return whatsappService.sendMessage(
+        conv.waId,
+        menu.buildSlotMenu(this.#fullSlots(ctx), ctx.tenant.timezone),
+      );
+    }
+    if (suggestion.type === 'next_day' || Utils.localDate(suggestion.start, ctx.tenant.timezone) !== ctx.current.day) {
+      ctx.flow = 'slot';
+      delete ctx.suggestion;
+      return this.#loadSlotsForDay(conv, ctx, suggestion.date, null, suggestion.start);
+    }
+    const professional = this.#resolveProfessional(ctx, suggestion.professionalId);
+    const entry = (ctx.dayAvailability?.available || []).find((e) => e.start === suggestion.start)
+      || {
+        start: suggestion.start,
+        end: suggestion.start,
+        timezone: ctx.tenant.timezone,
+        professionalIds: professional ? [professional.id] : [],
+        professionalNames: professional ? [professional.name] : [],
+      };
+    if (professional) ctx.current.professional = professional;
+    return this.#selectSlot(conv, ctx, entry, suggestion.professionalId);
+  }
+
+  async #selectSlot(conv, ctx, entry, professionalId = null) {
+    const professional = this.#resolveProfessional(ctx, professionalId || entry?.professionalIds?.[0]);
+    if (!professional) {
+      await whatsappService.sendMessage(conv.waId, 'No pude identificar al profesional. Elige otro, por favor. 🙁');
       return;
     }
-    ctx.current.slotStart = slots[idx].start;
+    ctx.current.professional = professional;
+    ctx.current.anyProfessional = false;
+    ctx.current.slotStart = entry.start;
+    const localDate = Utils.localDate(entry.start, ctx.tenant.timezone);
+    if (localDate) ctx.current.day = localDate;
     ctx.flow = 'confirm';
+    delete ctx.pendingTime;
+    delete ctx.suggestion;
+    delete ctx.lastUnavailable;
     await dbService.upsertConversation(conv.phone, { context: ctx });
-    const when = Utils.formatSlotLocal(ctx.current.slotStart, ctx.tenant.timezone);
+    const when = Utils.formatSlotLocal(entry.start, ctx.tenant.timezone);
     const summary =
       `*Confirma tu reserva* 📋\n\n` +
       `🏪 Negocio: ${ctx.tenant.name}\n` +
       `💈 Servicio: ${ctx.current.serviceName}\n` +
-      `🧑‍🔬 Profesional: ${ctx.current.professional.name}\n` +
+      `🧑‍🔬 Profesional: ${professional.name}\n` +
       `🕐 Fecha: ${when}\n` +
       `💰 Precio: ${Utils.money(ctx.current.price, ctx.current.currency)}\n\n` +
       `¿Confirmas?`;
@@ -553,16 +1223,40 @@ class Orchestrator {
   }
 
   async #confirmStep(conv, ctx, text, messageId) {
-    if (/^confirm:no$/i.test(text)) {
+    const clean = String(text ?? '').trim();
+    const n = norm(clean);
+    if (/^confirm:no$/i.test(clean) || /^(no|cancelar|mejor no)$/.test(n)) {
       await dbService.clearContext(conv.phone);
       await whatsappService.sendMessage(conv.waId, 'Listo, cancelamos. ¿Buscas algo más? 😉');
       return whatsappService.sendMessage(conv.waId, menu.buildMainMenu(conv.name, conv.city));
     }
-    if (/^confirm:yes$/i.test(text) || /^(si|sí|confirmar|confirmo|adelante)$/i.test(text)) {
+    if (/^confirm:yes$/i.test(clean) || /^(si|sí|confirmar|confirmo|adelante|dale)$/.test(n)) {
       await this.#doBooking(conv, ctx, messageId);
       return;
     }
-    await whatsappService.sendMessage(conv.waId, 'Responde con *Confirmar* o *Cancelar*.');
+    if (/^(cambiar|otra hora|elegir otra|atras|volver|cambiar hora)$/.test(n)) {
+      ctx.flow = 'slot';
+      await dbService.upsertConversation(conv.phone, { context: ctx });
+      return whatsappService.sendMessage(
+        conv.waId,
+        menu.buildSlotMenu(this.#fullSlots(ctx), ctx.tenant.timezone),
+      );
+    }
+    // Si desde la confirmación escribe otra hora o día, lo llevamos al flujo
+    // de selección sin perder el contexto de servicio/profesional.
+    const timeReq = parseTimeRequest(clean, { context: 'slot' });
+    if (timeReq.kind !== 'none') {
+      ctx.flow = 'slot';
+      await dbService.upsertConversation(conv.phone, { context: ctx });
+      return this.#handleTimeRequest(conv, ctx, timeReq);
+    }
+    const dayReq = parseDayRequest(clean, { today: todayInZone(ctx.tenant.timezone) });
+    if (dayReq) {
+      ctx.flow = 'day';
+      await dbService.upsertConversation(conv.phone, { context: ctx });
+      return this.#dayStep(conv, ctx, clean);
+    }
+    await whatsappService.sendMessage(conv.waId, 'Responde con *Confirmar* o *Cancelar*, o dime otra hora (ej. *3:30 pm*).');
   }
 
   async #payStep(conv, ctx, text) {
@@ -611,8 +1305,16 @@ class Orchestrator {
         (s) => s.start === ctx.current.slotStart && s.available && !s.blocked,
       );
       if (!stillAvailable) {
-        await whatsappService.sendMessage(conv.waId, 'Ese horario ya fue tomado. Elige otro. ⏰');
-        await this.#slotStep(conv, ctx, ' ');
+        await whatsappService.sendMessage(conv.waId, 'Ese horario acaba de ocuparse. Te busco la mejor alternativa. ⏰');
+        const target = Utils.localMinutes(ctx.current.slotStart, ctx.tenant.timezone);
+        ctx.flow = 'slot';
+        await dbService.upsertConversation(conv.phone, { context: ctx });
+        await this.#loadSlotsForDay(conv, ctx, ctx.current.day, {
+          kind: 'exact',
+          hour: Math.floor(target / 60),
+          minute: target % 60,
+          text: 'reselection',
+        });
         return;
       }
       const phone = Utils.normalizePhoneE164(conv.phone) || `+${conv.phone}`;
@@ -674,10 +1376,22 @@ class Orchestrator {
     } catch (err) {
       const data = err?.response?.data?.error;
       Utils.log('warn', `doBooking ${ctx.tenant?.name}: ${err.message} ${JSON.stringify(data || {})}`);
-      const hint = data?.code === 'AVAILABILITY_CONFLICT' ? 'Ese horario ya fue tomado. Elige otro. ⏰' : 'No pudimos confirmar la reserva. Intenta con otro horario. 🙁';
-      await whatsappService.sendMessage(conv.waId, hint);
-      await this.#slotStep(conv, ctx, ' ');
-      return;
+      if (data?.code === 'AVAILABILITY_CONFLICT') {
+        await whatsappService.sendMessage(conv.waId, 'Ese horario acaba de ocuparse. Te busco la mejor alternativa. ⏰');
+        const target = Utils.localMinutes(ctx.current.slotStart, ctx.tenant.timezone);
+        ctx.flow = 'slot';
+        await dbService.upsertConversation(conv.phone, { context: ctx });
+        await this.#loadSlotsForDay(conv, ctx, ctx.current.day, {
+          kind: 'exact',
+          hour: Math.floor(target / 60),
+          minute: target % 60,
+          text: 'reselection',
+        });
+        return;
+      }
+      await whatsappService.sendMessage(conv.waId, 'No pudimos confirmar la reserva. Intenta con otro horario. 🙁');
+      ctx.flow = 'slot';
+      return this.#slotStep(conv, ctx, ' ');
     }
   }
 
