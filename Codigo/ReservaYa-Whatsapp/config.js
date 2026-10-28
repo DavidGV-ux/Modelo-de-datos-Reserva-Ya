@@ -20,6 +20,10 @@ module.exports = {
     // (p. ej. la app Live de fyn como transporte del 312), Meta firma con EL
     // app secret de ESA app. Se aceptan ambos.
     appSecretAlt: process.env.WHATSAPP_APP_SECRET_ALT || '',
+    // Plantilla aprobada para el primer contacto. Meta no permite texto libre
+    // a un usuario que nunca ha escrito al negocio (ventana de 24 horas).
+    welcomeTemplate: process.env.WHATSAPP_WELCOME_TEMPLATE || 'bienvenida_reservaya',
+    welcomeTemplateLang: process.env.WHATSAPP_WELCOME_TEMPLATE_LANG || 'es',
   },
 
   // fyn (canal/transporte Live del 315): reenviamos sus eventos intactos para

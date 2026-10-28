@@ -61,6 +61,13 @@ app.post('/webhook', async (req, res) => {
   }
 
   if (info.isEmpty || info.hasStatus) {
+    const status = req.body?.entry?.[0]?.changes?.[0]?.value?.statuses?.[0];
+    if (status) {
+      const errorDetail = Array.isArray(status.errors) && status.errors.length
+        ? ` (${status.errors.map((e) => `${e.code}:${e.title || e.message || 'error'}`).join('; ')})`
+        : '';
+      Utils.log('info', `WhatsApp status ${status.status} para ${status.recipient_id}${errorDetail}`);
+    }
     return res.status(200).send('OK'); // solo statuses (recibos), no responder
   }
 
@@ -153,8 +160,27 @@ app.post('/internal/events', async (req, res) => {
         `(ej. *"corte de cabello accesible"*, *"café por menos de 10.000 pesos"*${city ? `, *"en ${user.city}"*` : ''}) ` +
         `y con mi asistente de IA te ayudo a encontrar negocios, comparar precios, reservar y ` +
         `recibir recordatorios. ¡Sin salir de WhatsApp! 📲`;
-      await whatsappService.sendMessage(phone, message);
-      Utils.log('info', `user.invite enviado a ${phone}`);
+
+      // El primer contacto debe usar plantilla: si el usuario nunca ha escrito
+      // al bot, Meta puede aceptar el texto pero no entregarlo (ventana 24 h).
+      let sentWithTemplate = false;
+      if (config.whatsapp.welcomeTemplate) {
+        try {
+          await whatsappService.sendTemplate(
+            phone,
+            config.whatsapp.welcomeTemplate,
+            config.whatsapp.welcomeTemplateLang,
+            [user.name || 'amigo'],
+          );
+          sentWithTemplate = true;
+        } catch (templateErr) {
+          Utils.log('warn', `user.invite plantilla fallo: ${templateErr.message}; usando texto libre`);
+        }
+      }
+      if (!sentWithTemplate) {
+        await whatsappService.sendMessage(phone, message);
+      }
+      Utils.log('info', `user.invite enviado a ${phone}${sentWithTemplate ? ' (plantilla)' : ' (texto)'}`);
       return res.status(200).send('ok');
     } catch (err) {
       Utils.log('error', `user.invite: ${err.message}`);
