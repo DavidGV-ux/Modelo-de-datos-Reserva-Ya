@@ -100,7 +100,19 @@ class Utils {
 
     const message = value.messages?.[0];
     if (!message) {
-      return { isEmpty: true, from: null, messageBody: '', messageType: 'none', userName: '', messageId: null };
+      const status = value.statuses?.[0];
+      return {
+        isEmpty: true,
+        from: status?.recipient_id || null,
+        messageBody: '',
+        messageType: status ? 'status' : 'none',
+        userName: '',
+        messageId: status?.id || null,
+        phoneNumberId: value.metadata?.phone_number_id || null,
+        hasStatus: Boolean(status),
+        status: status?.status || null,
+        statusErrors: status?.errors || [],
+      };
     }
 
     let messageBody = '';
