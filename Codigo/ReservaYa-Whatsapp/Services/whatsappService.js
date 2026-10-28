@@ -41,6 +41,29 @@ class WhatsAppService {
     });
   }
 
+  /**
+   * Envía una plantilla aprobada. Es obligatoria para iniciar conversación con
+   * un número que nunca ha escrito al negocio (regla de 24 horas de Meta).
+   */
+  async sendTemplate(to, name, language, bodyParameters = []) {
+    const components = bodyParameters.length
+      ? [{
+          type: 'body',
+          parameters: bodyParameters.map((text) => ({ type: 'text', text: String(text) })),
+        }]
+      : undefined;
+    return this.post('/messages', {
+      messaging_product: 'whatsapp',
+      to: this.sanitizeTo(to),
+      type: 'template',
+      template: {
+        name,
+        language: { code: language },
+        ...(components ? { components } : {}),
+      },
+    });
+  }
+
   async sendButtons(to, body, buttons) {
     return this.post('/messages', {
       messaging_product: 'whatsapp',
