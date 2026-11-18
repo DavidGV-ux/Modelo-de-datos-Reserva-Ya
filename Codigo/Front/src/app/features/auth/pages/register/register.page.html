@@ -1,102 +1,479 @@
-<div class="register-page">
-  <div class="register-page__brand">
-    <a class="register-page__logo" routerLink="/">
-      <mat-icon>storefront</mat-icon>
-      <span>ReservaYa</span>
-    </a>
-  </div>
+<section class="register-page">
+  <div class="register-shell">
+    <div class="row g-4 g-xl-5 align-items-stretch">
+      <div class="col-12 col-lg-5 order-2 order-lg-1">
+        <aside
+          class="register-intro"
+          [attr.aria-label]="'auth.register.side_title' | translate"
+        >
+          <div class="register-intro__content">
+            <span class="register-intro__eyebrow">
+              <mat-icon aria-hidden="true">verified_user</mat-icon>
+              {{ 'auth.register.side_eyebrow' | translate }}
+            </span>
 
-  <div class="container">
-    <div class="row justify-content-center">
-      <div class="col-12 col-sm-10 col-md-8 col-lg-6 col-xl-5">
+            <p class="register-intro__title">
+              {{ 'auth.register.side_title' | translate }}
+            </p>
+            <p class="register-intro__text">{{ 'auth.register.side_text' | translate }}</p>
+
+            <ul class="register-intro__benefits">
+              @for (benefit of benefits; track benefit.title) {
+                <li class="register-intro__benefit">
+                  <span class="register-intro__benefit-icon">
+                    <mat-icon aria-hidden="true">{{ benefit.icon }}</mat-icon>
+                  </span>
+                  <div>
+                    <strong>{{ benefit.title | translate }}</strong>
+                    <span>{{ benefit.text | translate }}</span>
+                  </div>
+                </li>
+              }
+            </ul>
+          </div>
+
+          <div class="register-intro__trust">
+            <mat-icon aria-hidden="true">lock</mat-icon>
+            <span>{{ 'auth.register.side_footnote' | translate }}</span>
+          </div>
+        </aside>
+      </div>
+
+      <div class="col-12 col-lg-7 order-1 order-lg-2">
         <mat-card class="register-card" appearance="outlined">
           <mat-card-content>
-            <div class="register-card__header">
+            <header class="register-card__header">
               <div class="register-card__icon">
-                <mat-icon>person_add</mat-icon>
+                <mat-icon aria-hidden="true">person_add</mat-icon>
               </div>
-              <h1 class="register-card__title">{{ 'auth.register.title' | translate }}</h1>
-              <p class="register-card__subtitle text-muted mb-0">
-                {{ 'auth.register.subtitle' | translate }}
-              </p>
-            </div>
-
-            <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
-              <mat-form-field appearance="outline" class="w-100 mb-2">
-                <mat-label>{{ 'auth.register.name_label' | translate }}</mat-label>
-                <input matInput formControlName="name" autocomplete="name" />
-                @if (form.controls.name.hasError('required')) {
-                  <mat-error>{{ 'auth.register.name_required' | translate }}</mat-error>
-                }
-              </mat-form-field>
-
-              <mat-form-field appearance="outline" class="w-100 mb-2">
-                <mat-label>{{ 'auth.register.email_label' | translate }}</mat-label>
-                <input matInput formControlName="email" type="email" autocomplete="email" />
-                @if (form.controls.email.hasError('required')) {
-                  <mat-error>{{ 'auth.register.email_required' | translate }}</mat-error>
-                } @else if (form.controls.email.hasError('email')) {
-                  <mat-error>{{ 'auth.register.email_invalid' | translate }}</mat-error>
-                }
-              </mat-form-field>
-
-              <mat-form-field appearance="outline" class="w-100 mb-2">
-                <mat-label>{{ 'auth.register.password_label' | translate }}</mat-label>
-                <input matInput formControlName="password" type="password" autocomplete="new-password" />
-                @if (form.controls.password.hasError('required')) {
-                  <mat-error>{{ 'auth.register.password_required' | translate }}</mat-error>
-                } @else if (form.controls.password.hasError('minlength')) {
-                  <mat-error>{{ 'auth.register.password_min' | translate }}</mat-error>
-                }
-              </mat-form-field>
-
-              <mat-form-field appearance="outline" class="w-100 mb-2">
-                <mat-label>{{ 'auth.register.confirm_label' | translate }}</mat-label>
-                <input matInput formControlName="confirmPassword" type="password" autocomplete="new-password" />
-                @if (form.controls.confirmPassword.hasError('required')) {
-                  <mat-error>{{ 'auth.register.confirm_required' | translate }}</mat-error>
-                } @else if (form.controls.confirmPassword.hasError('mismatch')) {
-                  <mat-error>{{ 'auth.register.confirm_mismatch' | translate }}</mat-error>
-                }
-              </mat-form-field>
-
-              <div class="register-card__consent">
-                <mat-checkbox formControlName="habeasDataConsent" color="primary">
-                  {{ 'auth.register.consent_label' | translate }}
-                  <a class="register-card__privacy" routerLink="/privacidad">
-                    {{ 'auth.register.privacy_link' | translate }}
-                  </a>
-                </mat-checkbox>
-                @if (form.controls.habeasDataConsent.hasError('required')) {
-                  <mat-error class="register-card__consent-error">
-                    {{ 'auth.register.consent_required' | translate }}
-                  </mat-error>
-                }
+              <div>
+                <h1 class="register-card__title">{{ 'auth.register.title' | translate }}</h1>
+                <p class="register-card__subtitle">{{ 'auth.register.subtitle' | translate }}</p>
               </div>
+            </header>
 
-              <button
-                mat-flat-button
-                class="register-card__submit w-100"
-                color="primary"
-                type="submit"
-                [disabled]="submitting()"
-              >
-                @if (submitting()) {
-                  <mat-spinner [diameter]="20" />
-                } @else {
-                  <mat-icon>login</mat-icon>
-                  {{ 'auth.register.submit' | translate }}
+            <p class="register-card__required">
+              <span aria-hidden="true">*</span> {{ 'auth.register.required_note' | translate }}
+            </p>
+
+            @if (step() === 'form') {
+            <form #registerForm [formGroup]="form" (ngSubmit)="submit()" novalidate>
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <mat-form-field appearance="outline" class="w-100" subscriptSizing="dynamic">
+                    <mat-label>{{ 'auth.register.first_name_label' | translate }}</mat-label>
+                    <input
+                      matInput
+                      formControlName="firstName"
+                      autocomplete="given-name"
+                      maxlength="60"
+                      required
+                      (blur)="normalizeFirstName()"
+                    />
+                    @if (form.controls.firstName.hasError('required')) {
+                      <mat-error>{{ 'auth.register.first_name_required' | translate }}</mat-error>
+                    } @else if (form.controls.firstName.hasError('trimmedMin')) {
+                      <mat-error>{{ 'auth.register.first_name_min' | translate }}</mat-error>
+                    } @else if (
+                      form.controls.firstName.hasError('trimmedMax') ||
+                      form.controls.firstName.hasError('maxlength')
+                    ) {
+                      <mat-error>{{ 'auth.register.first_name_max' | translate }}</mat-error>
+                    } @else if (form.controls.firstName.hasError('pattern')) {
+                      <mat-error>El nombre no puede contener números</mat-error>
+                    }
+                  </mat-form-field>
+                </div>
+
+                <div class="col-md-6">
+                  <mat-form-field appearance="outline" class="w-100" subscriptSizing="dynamic">
+                    <mat-label>{{ 'auth.register.last_name_label' | translate }}</mat-label>
+                    <input
+                      matInput
+                      formControlName="lastName"
+                      autocomplete="family-name"
+                      maxlength="60"
+                      required
+                      (blur)="normalizeLastName()"
+                    />
+                    @if (form.controls.lastName.hasError('required')) {
+                      <mat-error>{{ 'auth.register.last_name_required' | translate }}</mat-error>
+                    } @else if (form.controls.lastName.hasError('trimmedMin')) {
+                      <mat-error>{{ 'auth.register.last_name_min' | translate }}</mat-error>
+                    } @else if (
+                      form.controls.lastName.hasError('trimmedMax') ||
+                      form.controls.lastName.hasError('maxlength')
+                    ) {
+                      <mat-error>{{ 'auth.register.last_name_max' | translate }}</mat-error>
+                    } @else if (form.controls.lastName.hasError('pattern')) {
+                      <mat-error>El apellido no puede contener números</mat-error>
+                    }
+                  </mat-form-field>
+                </div>
+
+                <div class="col-md-4">
+                  <mat-form-field appearance="outline" class="w-100" subscriptSizing="dynamic">
+                    <mat-label>Indicativo</mat-label>
+                    <mat-select formControlName="phoneCountry">
+                      @for (c of countries(); track c.isoCode) {
+                        <mat-option [value]="c.isoCode">{{ c.flag }} +{{ c.phonecode }} {{ c.name }}</mat-option>
+                      }
+                    </mat-select>
+                  </mat-form-field>
+                </div>
+
+                <div class="col-md-4">
+                  <mat-form-field appearance="outline" class="w-100" subscriptSizing="dynamic">
+                    <mat-label>Teléfono (WhatsApp)</mat-label>
+                    <input
+                      matInput
+                      formControlName="phone"
+                      type="tel"
+                      inputmode="tel"
+                      autocomplete="tel-national"
+                      required
+                      (blur)="normalizePhone()"
+                    />
+                    @if (form.controls.phone.hasError('required')) {
+                      <mat-error>{{ 'auth.register.phone_required' | translate }}</mat-error>
+                    } @else if (form.controls.phone.hasError('minlength')) {
+                      <mat-error>El teléfono debe tener al menos 7 dígitos</mat-error>
+                    } @else if (form.controls.phone.hasError('pattern')) {
+                      <mat-error>El teléfono solo puede contener números</mat-error>
+                    }
+                  </mat-form-field>
+                </div>
+
+                <div class="col-md-4">
+                  <mat-form-field appearance="outline" class="w-100" subscriptSizing="dynamic">
+                    <mat-label>País de la ciudad</mat-label>
+                    <mat-select formControlName="cityCountry" (selectionChange)="onCityCountryChange()">
+                      @for (c of countries(); track c.isoCode) {
+                        <mat-option [value]="c.isoCode">{{ c.flag }} {{ c.name }}</mat-option>
+                      }
+                    </mat-select>
+                  </mat-form-field>
+                </div>
+
+                <div class="col-md-4">
+                  <mat-form-field appearance="outline" class="w-100" subscriptSizing="dynamic">
+                    <mat-label>Ciudad</mat-label>
+                    <input
+                      matInput
+                      formControlName="city"
+                      [matAutocomplete]="cityAuto"
+                      (input)="onCityInput($event)"
+                    />
+                    <mat-autocomplete #cityAuto="matAutocomplete">
+                      @for (city of filteredCities(); track city) {
+                        <mat-option [value]="city">{{ city }}</mat-option>
+                      }
+                    </mat-autocomplete>
+                    @if (cityCount() > 0) {
+                      <mat-hint>{{ cityCount() }} ciudades disponibles</mat-hint>
+                    }
+                  </mat-form-field>
+                </div>
+
+                <div class="col-md-6">
+                  <mat-form-field appearance="outline" class="w-100" subscriptSizing="dynamic">
+                    <mat-label>{{ 'auth.register.email_label' | translate }}</mat-label>
+                    <input
+                      matInput
+                      formControlName="email"
+                      type="email"
+                      inputmode="email"
+                      autocomplete="email"
+                      maxlength="254"
+                      required
+                      (blur)="normalizeEmail()"
+                    />
+                    @if (form.controls.email.hasError('required')) {
+                      <mat-error>{{ 'auth.register.email_required' | translate }}</mat-error>
+                    } @else if (form.controls.email.hasError('taken')) {
+                      <mat-error>{{ 'auth.register.email_taken' | translate }}</mat-error>
+                    } @else if (
+                      form.controls.email.hasError('email') ||
+                      form.controls.email.hasError('maxlength')
+                    ) {
+                      <mat-error>{{ 'auth.register.email_invalid' | translate }}</mat-error>
+                    }
+                  </mat-form-field>
+                </div>
+
+                <div class="col-md-6">
+                  <mat-form-field appearance="outline" class="w-100" subscriptSizing="dynamic">
+                    <mat-label>{{ 'auth.register.password_label' | translate }}</mat-label>
+                    <input
+                      matInput
+                      formControlName="password"
+                      [type]="showPassword() ? 'text' : 'password'"
+                      autocomplete="new-password"
+                      maxlength="72"
+                      required
+                    />
+                    <button
+                      mat-icon-button
+                      matSuffix
+                      type="button"
+                      class="register-card__eye"
+                      (click)="showPassword.set(!showPassword())"
+                      [attr.aria-label]="
+                        (showPassword()
+                          ? 'auth.register.password_hide'
+                          : 'auth.register.password_show'
+                        ) | translate
+                      "
+                      [matTooltip]="
+                        (showPassword()
+                          ? 'auth.register.password_hide'
+                          : 'auth.register.password_show'
+                        ) | translate
+                      "
+                    >
+                      <mat-icon aria-hidden="true">
+                        {{ showPassword() ? 'visibility_off' : 'visibility' }}
+                      </mat-icon>
+                    </button>
+                    @if (form.controls.password.hasError('required')) {
+                      <mat-error>{{ 'auth.register.password_required' | translate }}</mat-error>
+                    } @else if (form.controls.password.hasError('minlength')) {
+                      <mat-error>{{ 'auth.register.password_min' | translate }}</mat-error>
+                    } @else if (form.controls.password.hasError('maxlength')) {
+                      <mat-error>{{ 'auth.register.password_max' | translate }}</mat-error>
+                    }
+                    <mat-hint>{{ 'auth.register.password_hint' | translate }}</mat-hint>
+                  </mat-form-field>
+                </div>
+
+                <div class="col-md-6">
+                  <mat-form-field appearance="outline" class="w-100" subscriptSizing="dynamic">
+                    <mat-label>{{ 'auth.register.confirm_label' | translate }}</mat-label>
+                    <input
+                      matInput
+                      formControlName="confirmPassword"
+                      [type]="showConfirmPassword() ? 'text' : 'password'"
+                      autocomplete="new-password"
+                      maxlength="72"
+                      required
+                    />
+                    <button
+                      mat-icon-button
+                      matSuffix
+                      type="button"
+                      class="register-card__eye"
+                      (click)="showConfirmPassword.set(!showConfirmPassword())"
+                      [attr.aria-label]="
+                        (showConfirmPassword()
+                          ? 'auth.register.password_hide'
+                          : 'auth.register.password_show'
+                        ) | translate
+                      "
+                      [matTooltip]="
+                        (showConfirmPassword()
+                          ? 'auth.register.password_hide'
+                          : 'auth.register.password_show'
+                        ) | translate
+                      "
+                    >
+                      <mat-icon aria-hidden="true">
+                        {{ showConfirmPassword() ? 'visibility_off' : 'visibility' }}
+                      </mat-icon>
+                    </button>
+                    @if (form.controls.confirmPassword.hasError('required')) {
+                      <mat-error>{{ 'auth.register.confirm_required' | translate }}</mat-error>
+                    } @else if (form.controls.confirmPassword.hasError('mismatch')) {
+                      <mat-error>{{ 'auth.register.confirm_mismatch' | translate }}</mat-error>
+                    } @else if (form.controls.confirmPassword.hasError('maxlength')) {
+                      <mat-error>{{ 'auth.register.password_max' | translate }}</mat-error>
+                    }
+                    <mat-hint>{{ 'auth.register.confirm_hint' | translate }}</mat-hint>
+                  </mat-form-field>
+                </div>
+
+                @if (strength().level > 0) {
+                  <div class="col-12">
+                    <div class="strength" [attr.data-level]="strength().level">
+                      <div
+                        class="strength__bars"
+                        role="progressbar"
+                        aria-valuemin="0"
+                        aria-valuemax="4"
+                        [attr.aria-valuenow]="strength().level"
+                        [attr.aria-label]="'auth.register.strength_label' | translate"
+                      >
+                        <span class="strength__bar"></span>
+                        <span class="strength__bar"></span>
+                        <span class="strength__bar"></span>
+                        <span class="strength__bar"></span>
+                      </div>
+                      <span class="strength__label" aria-live="polite">
+                        {{ strength().labelKey | translate }}
+                      </span>
+                    </div>
+                  </div>
                 }
-              </button>
+
+                <div class="col-12">
+                  <mat-checkbox
+                    formControlName="habeasDataConsent"
+                    color="primary"
+                    class="register-card__consent"
+                    required
+                  >
+                    {{ 'auth.register.consent_label' | translate }}
+                    <a
+                      routerLink="/privacidad"
+                      class="register-card__privacy"
+                      (click)="$event.stopPropagation()"
+                    >
+                      {{ 'auth.register.privacy_link' | translate }}
+                    </a>
+                  </mat-checkbox>
+                  @if (
+                    form.controls.habeasDataConsent.hasError('required') &&
+                    form.controls.habeasDataConsent.touched
+                  ) {
+                    <mat-error class="register-card__consent-error" role="alert">
+                      {{ 'auth.register.consent_required' | translate }}
+                    </mat-error>
+                  }
+                </div>
+
+                <div class="col-12">
+                  <div class="register-card__actions">
+                    <button
+                      mat-flat-button
+                      color="primary"
+                      type="submit"
+                      class="register-card__submit"
+                      [disabled]="submitting()"
+                      [attr.aria-busy]="submitting()"
+                    >
+                      @if (submitting()) {
+                        <mat-spinner [diameter]="20" />
+                      } @else {
+                        <mat-icon aria-hidden="true">person_add</mat-icon>
+                      }
+                      <span>
+                        {{ submitLabelKey() | translate }}
+                      </span>
+                    </button>
+
+                    <div class="register-card__login">
+                      <span>{{ 'auth.register.login_prompt' | translate }}</span>
+                      <button
+                        mat-stroked-button
+                        type="button"
+                        class="register-card__login-btn"
+                        (click)="login()"
+                      >
+                        {{ 'auth.register.login_link' | translate }}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
             </form>
+            } @else if (step() === 'code') {
+              <div class="code-step">
+                <h2>{{ 'auth.register.verify_title' | translate }}</h2>
+                <p>{{ 'auth.register.verify_text' | translate }}</p>
 
-            <div class="register-card__footer text-center">
-              <span class="text-muted">{{ 'auth.register.login_prompt' | translate }}</span>
-              <a mat-stroked-button routerLink="/">{{ 'auth.register.login_link' | translate }}</a>
-            </div>
+                <!-- Código de verificación generado por la aplicación -->
+                <div class="code-display">
+                  <span class="code-label">{{ 'auth.register.verification_code' | translate }}</span>
+                  <div class="code-value">{{ code() }}</div>
+                </div>
+
+                @if (codeExpired()) {
+                  <div class="code-expired-banner" role="alert">
+                    <mat-icon aria-hidden="true">schedule</mat-icon>
+                    <p>{{ 'auth.register.code_expired_inline' | translate }}</p>
+                  </div>
+                }
+
+                <!-- Botón WhatsApp con mensaje predefinido -->
+                <div class="whatsapp-verify">
+                  <button
+                    mat-flat-button
+                    color="primary"
+                    type="button"
+                    class="register-card__submit"
+                    (click)="openWhatsAppVerification()"
+                  >
+                    <mat-icon aria-hidden="true">chat</mat-icon>
+                    <span>{{ 'auth.register.whatsapp_verify_button' | translate }}</span>
+                  </button>
+                  <p class="whatsapp-verify__hint">{{ 'auth.register.whatsapp_verify_hint' | translate }}</p>
+
+                  <!-- RY-QR-THIRDPARTY-CODE: sin QR de terceros; el OTP solo viaja a wa.me -->
+                  <div class="qr-container">
+                    <a [href]="whatsappDeepLink()" target="_blank" rel="noopener noreferrer">
+                      {{ 'auth.register.whatsapp_verify_button' | translate }}
+                    </a>
+                  </div>
+                </div>
+
+                <div class="code-actions">
+                  <button mat-stroked-button type="button" [disabled]="resendCooldown() > 0 || submitting()" (click)="resendCode()">
+                    {{ 'auth.register.resend_code' | translate }} @if (resendCooldown() > 0) { ({{ resendCooldown() }}s) }
+                  </button>
+                  <button mat-stroked-button type="button" [disabled]="submitting()" (click)="changingPhone.set(!changingPhone())">
+                    {{ 'auth.register.change_number' | translate }}
+                  </button>
+                </div>
+                @if (changingPhone()) {
+                  <div class="change-phone">
+                    <mat-form-field appearance="outline" class="w-100">
+                      <mat-label>{{ 'auth.register.new_phone' | translate }}</mat-label>
+                      <input matInput #newPhoneInput type="tel" />
+                    </mat-form-field>
+                    <button mat-flat-button color="primary" type="button" [disabled]="submitting()" (click)="confirmChangePhone(newPhoneInput.value)">
+                      {{ 'auth.register.send_code' | translate }}
+                    </button>
+                  </div>
+                }
+              </div>
+            }
+            @if (step() === 'verified') {
+              <div class="verified-step">
+                @if (verificationExpired()) {
+                  <mat-icon class="verified-step__icon" aria-hidden="true">schedule</mat-icon>
+                  <h2>{{ 'auth.register.code_expired_title' | translate }}</h2>
+                  <p>{{ 'auth.register.code_expired_text' | translate }}</p>
+                  <button
+                    mat-flat-button
+                    color="primary"
+                    type="button"
+                    class="register-card__submit"
+                    (click)="restartRegistration()"
+                  >
+                    {{ 'auth.register.restart' | translate }}
+                  </button>
+                } @else if (!autoLoginFailed()) {
+                  <mat-spinner [diameter]="42" />
+                  <h2>{{ 'auth.register.verified_title' | translate }}</h2>
+                  <p>{{ 'auth.register.verified_auto_login' | translate }}</p>
+                } @else {
+                  <mat-icon class="verified-step__icon" aria-hidden="true">check_circle</mat-icon>
+                  <h2>{{ 'auth.register.verified_title' | translate }}</h2>
+                  <p>{{ 'auth.register.auto_login_failed' | translate }}</p>
+                  <button
+                    mat-flat-button
+                    color="primary"
+                    type="button"
+                    class="register-card__submit"
+                    (click)="login()"
+                  >
+                    {{ 'auth.register.login_now' | translate }}
+                  </button>
+                }
+              </div>
+            }
           </mat-card-content>
         </mat-card>
       </div>
     </div>
   </div>
-</div>
+</section>

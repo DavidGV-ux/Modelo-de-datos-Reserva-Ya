@@ -71,10 +71,42 @@ export class AuthService {
     );
   }
 
+  /**
+   * Inicia sesión sin redirección usando el Direct Access Grant de Keycloak.
+   * Se usa al completar el registro verificado por WhatsApp para que el usuario
+   * entre directo a la app con la sesión ya iniciada.
+   */
+  async loginWithPassword(username: string, password: string): Promise<boolean> {
+    await this.ready;
+    await this.oauth.fetchTokenUsingPasswordFlow(username.trim(), password);
+    this.refreshState();
+    return this.isAuthed();
+  }
+
   logout(): void {
-    this.oauth.logOut();
+    const idToken = this.oauth.getIdToken();
+    // Limpia el estado local de la SPA.
+    this.oauth.logOut(true);
     this.isAuthed.set(false);
     this.profile.set({ roles: [], tenantIds: [], name: null, email: null });
+    try {
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('id_token');
+      localStorage.removeItem('refresh_token');
+      sessionStorage.clear();
+    } catch {
+      /* ignore */
+    }
+    // Cierra también la sesión SSO en Keycloak (end_session_endpoint).
+    const endSession = this.oauth.logoutUrl;
+    if (endSession) {
+      const url = new URL(endSession);
+      if (idToken) url.searchParams.set('id_token_hint', idToken);
+      url.searchParams.set('post_logout_redirect_uri', environment.keycloak.postLogoutRedirectUri);
+      window.location.href = url.toString();
+      return;
+    }
+    window.location.href = environment.keycloak.postLogoutRedirectUri;
   }
 
   hasRole(role: UserRole): boolean {

@@ -282,6 +282,46 @@ export class DashboardService {
       );
   }
 
+  ownerBranding(tenantId: string): Observable<Tenant> {
+    if (environment.useMockBackend) {
+      return of({ ...MOCK_TENANT, brandColor: '#2e7d32' });
+    }
+    return this.api
+      .get<BackendTenant>(`/owner/${tenantId}/branding`, tenantId)
+      .pipe(map(mapTenant));
+  }
+
+  updateOwnerBranding(
+    tenantId: string,
+    brandColor: string,
+    version: number,
+  ): Observable<Tenant> {
+    if (environment.useMockBackend) {
+      return of({ ...MOCK_TENANT, brandColor, version: version + 1 });
+    }
+    return this.api
+      .patch<BackendTenant>(`/owner/${tenantId}/branding`, { brandColor, version }, tenantId)
+      .pipe(map(mapTenant));
+  }
+
+  uploadOwnerLogo(tenantId: string, image: string, version: number): Observable<Tenant> {
+    if (environment.useMockBackend) {
+      return of({ ...MOCK_TENANT, logoUrl: image, version: version + 1 });
+    }
+    return this.api
+      .put<BackendTenant>(`/owner/${tenantId}/branding/logo`, { image, version }, tenantId)
+      .pipe(map(mapTenant));
+  }
+
+  removeOwnerLogo(tenantId: string, version: number): Observable<Tenant> {
+    if (environment.useMockBackend) {
+      return of({ ...MOCK_TENANT, logoUrl: undefined, version: version + 1 });
+    }
+    return this.api
+      .delete<BackendTenant>(`/owner/${tenantId}/branding/logo?version=${encodeURIComponent(String(version))}`, tenantId)
+      .pipe(map(mapTenant));
+  }
+
   ownerServices(tenantId: string): Observable<Service[]> {
     if (environment.useMockBackend) {
       return of(MOCK_SERVICES);

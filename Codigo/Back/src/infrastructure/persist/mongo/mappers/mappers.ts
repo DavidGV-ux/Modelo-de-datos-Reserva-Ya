@@ -41,6 +41,10 @@ function settingsFromDoc(doc: Doc): Tenant['settings'] {
     preferredNotificationChannel: (s.preferred_notification_channel as Tenant['settings']['preferredNotificationChannel']) ?? 'whatsapp',
     reminderHours: intToNumber(s.reminder_hours ?? 24),
     whatsappPhoneNumberId: s.whatsapp_phone_number_id as string | undefined,
+    bookingMode: s.booking_mode === 'capacity' || s.booking_mode === 'exclusive'
+      ? s.booking_mode
+      : undefined,
+    capacityPerSlot: s.capacity_per_slot == null ? undefined : intToNumber(s.capacity_per_slot),
   };
 }
 
@@ -58,8 +62,9 @@ export function tenantToDomain(doc: Doc): Tenant {
     country: doc.country as string | undefined,
     category: (doc.category as Tenant['category']) ?? 'other',
     city: doc.city as string | undefined,
-    logoUrl: doc.logo_url as string | undefined,
-    coverUrl: doc.cover_url as string | undefined,
+    logoUrl: typeof doc.logo_url === 'string' ? doc.logo_url : undefined,
+    coverUrl: typeof doc.cover_url === 'string' ? doc.cover_url : undefined,
+    brandColor: typeof doc.brand_color === 'string' ? doc.brand_color : undefined,
     address: doc.address as string | undefined,
     phone: doc.phone as string | undefined,
     settings: settingsFromDoc(doc),

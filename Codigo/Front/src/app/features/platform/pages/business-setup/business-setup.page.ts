@@ -1,4 +1,5 @@
-import { ChangeDetectionStrategy, Component, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, inject, OnInit, PLATFORM_ID, signal } from '@angular/core';
+import { isPlatformBrowser } from '@angular/common';
 import { Router } from '@angular/router';
 import {
   FormControl,
@@ -18,8 +19,32 @@ import { TranslatePipe } from '@ngx-translate/core';
 import { AuthService } from '../../../../core/auth/auth.service';
 import { DashboardService } from '../../../dashboard/services/dashboard.service';
 import { PlatformService, TENANT_CATEGORIES, TenantCategoryId } from '../../services/platform.service';
+import { compressLogoFile } from '../../../../shared/utils/image-compression';
 
 export const OWNER_TENANT_KEY = 'reserwaya.ownerTenant';
+
+const COLOMBIAN_CITIES = [
+  'Bogotá',
+  'Medellín',
+  'Cali',
+  'Barranquilla',
+  'Cartagena',
+  'Bucaramanga',
+  'Pereira',
+  'Manizales',
+  'Santa Marta',
+  'Cúcuta',
+  'Ibagué',
+  'Pasto',
+  'Villavicencio',
+  'Armenia',
+  'Neiva',
+  'Popayán',
+  'Montería',
+  'Valledupar',
+  'Sincelejo',
+  'Tunja',
+];
 
 @Component({
   selector: 'app-business-setup-page',
@@ -87,6 +112,23 @@ export const OWNER_TENANT_KEY = 'reserwaya.ownerTenant';
                 <mat-label>{{ 'onboarding.biz_description' | translate }}</mat-label>
                 <textarea matInput formControlName="description" rows="3"></textarea>
               </mat-form-field>
+
+              <mat-form-field appearance="outline">
+                <mat-label>{{ 'onboarding.biz_city' | translate }}</mat-label>
+                <mat-select formControlName="city">
+                  @for (city of cities(); track city) {
+                    <mat-option [value]="city">{{ city }}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+
+              <div class="setup__logo">
+                <label>{{ 'dashboard.branding_logo_title' | translate }}</label>
+                @if (logoDataUrl(); as url) {
+                  <img [src]="url" alt="logo" class="setup__logo-preview" />
+                }
+                <input type="file" accept="image/*" (change)="onLogoSelected($event)" [disabled]="uploadingLogo()" />
+              </div>
 
               <div class="setup__row">
                 <mat-form-field appearance="outline">
@@ -258,6 +300,24 @@ export class BusinessSetupPage {
 
   protected readonly submitting = signal(false);
   protected readonly categories = TENANT_CATEGORIES;
+  private readonly platformId = inject(PLATFORM_ID);
+  protected readonly logoDataUrl = signal<string | null>(null);
+  protected readonly uploadingLogo = signal(false);
+
+  protected readonly cities = signal<string[]>(COLOMBIAN_CITIES);
+  protected readonly loadingCities = signal(false);
+
+  private async loadCities(country: string | null): Promise<void> {
+    if (!isPlatformBrowser(this.platformId)) return;
+    this.loadingCities.set(true);
+    try {
+      const { City } = await import('country-state-city');
+      const list = City.getCitiesOfCountry(country ?? 'CO')?.map((c) => c.name) ?? [];
+      this.cities.set(Array.from(new Set(list)).sort());
+    } finally {
+      this.loadingCities.set(false);
+    }
+  }
 
   protected readonly form = new FormGroup({
     name: new FormControl('', {
@@ -270,6 +330,7 @@ export class BusinessSetupPage {
     tagline: new FormControl(''),
     description: new FormControl(''),
     country: new FormControl('CO'),
+    city: new FormControl(''),
     currency: new FormControl<'COP' | 'USD'>('COP'),
     phone: new FormControl(''),
     address: new FormControl(''),
@@ -293,6 +354,30 @@ export class BusinessSetupPage {
     }
   }
 
+  protected async onLogoSelected(event: Event): Promise<void> {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    if (!file) return;
+    this.uploadingLogo.set(true);
+    try {
+      const dataUrl = await compressLogoFile(file);
+      this.logoDataUrl.set(dataUrl);
+    } catch {
+      this.snackbar.open('common.error', undefined, { duration: 3000 });
+    } finally {
+      this.uploadingLogo.set(false);
+    }
+  }
+
+  async ngOnInit(): Promise<void> {
+    await this.loadCities(this.form.controls.country.value);
+    this.form.controls.country.valueChanges.subscribe((country) => {
+      void this.loadCities(country);
+      this.form.patchValue({ city: '' });
+    });
+  }
+
   protected submit(): void {
     const v = this.form.value;
     if (!v.name || !v.slug) return;
@@ -306,6 +391,7 @@ export class BusinessSetupPage {
         tagline: v.tagline || undefined,
         description: v.description || undefined,
         country: v.country || undefined,
+        city: v.city || undefined,
         currency: v.currency ?? 'COP',
         phone: v.phone || undefined,
         address: v.address || undefined,
@@ -315,13 +401,34 @@ export class BusinessSetupPage {
           this.submitting.set(false);
           this.dashboard.invalidateTenants();
           localStorage.setItem(OWNER_TENANT_KEY, result.tenant.tenantId);
-          this.snackbar.open(result.confirmation.message, undefined, { duration: 4000 });
-          void this.router.navigateByUrl(result.confirmation.nextStep ?? '/app/owner');
+          const finish = () => {
+            this.snackbar.open(result.confirmation.message, undefined, { duration: 4000 });
+            const slug = result.tenant.slug;
+            const goBusiness = window.confirm('¿Deseas ir a la página de tu negocio recién creado?');
+            if (goBusiness) {
+              void this.router.navigateByUrl(`/${slug}`);
+            } else {
+              void this.router.navigateByUrl('/app');
+            }
+          };
+          const logo = this.logoDataUrl();
+          if (logo) {
+            this.dashboard.uploadOwnerLogo(result.tenant.tenantId, logo, (result.tenant as { version?: number }).version ?? 1).subscribe({
+              next: () => finish(),
+              error: () => finish(),
+            });
+          } else {
+            finish();
+          }
         },
         error: (err) => {
           this.submitting.set(false);
           const detail =
-            typeof err?.error?.message === 'string' ? err.error.message : 'common.error';
+            typeof err?.error?.error?.message === 'string'
+              ? err.error.error.message
+              : typeof err?.error?.message === 'string'
+                ? err.error.message
+                : 'common.error';
           this.snackbar.open(detail, undefined, { duration: 5000, panelClass: 'snackbar-error' });
         },
       });

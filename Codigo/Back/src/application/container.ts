@@ -7,8 +7,10 @@ import {
   PaymentTransactionRepository,
   PlanRepository,
   PlatformUserRepository,
+  PendingRegistrationRepository,
   ProfessionalRepository,
   ServiceRepository,
+  TenantAssetRepository,
   TenantRepository,
   TenantUserRepository,
   TimeSlotRepository,
@@ -44,6 +46,8 @@ export interface AppDependencies {
     tenantUsers: TenantUserRepository;
     platformUsers: PlatformUserRepository;
     userProfiles: UserProfileRepository;
+    pendingRegistrations: PendingRegistrationRepository;
+    tenantAssets: TenantAssetRepository;
     audit: AuditLogRepository;
   };
   uow: UnitOfWork;
@@ -77,6 +81,7 @@ export class AppServices {
       plans: deps.repos.plans,
       tenantUsers: deps.repos.tenantUsers,
       platformUsers: deps.repos.platformUsers,
+      tenantAssets: deps.repos.tenantAssets,
       audit: deps.repos.audit,
     });
     this.onboarding = new OnboardingUseCases({
@@ -147,7 +152,10 @@ export class AppServices {
       appointments: deps.repos.appointments,
       profiles: deps.repos.userProfiles,
     });
-    this.profile = new ProfileUseCases({ userProfiles: deps.repos.userProfiles });
+    this.profile = new ProfileUseCases({
+      userProfiles: deps.repos.userProfiles,
+      pendingRegistrations: deps.repos.pendingRegistrations,
+    });
     this.identity = deps.identity;
   }
 }

@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, OnInit, computed, inject, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, OnInit, computed, effect, inject, signal } from '@angular/core';
 import { ActivatedRoute, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatButtonModule } from '@angular/material/button';
@@ -8,6 +8,7 @@ import { MatDividerModule } from '@angular/material/divider';
 import { TranslatePipe } from '@ngx-translate/core';
 import { LocaleSwitcher } from '../../shared/components/locale-switcher/locale-switcher.component';
 import { TenantService, tenantSlugFromSnapshot } from '../../features/public-portal/services/tenant.service';
+import { contrastColor, normalizeBrandColor } from '../../shared/utils/color';
 
 @Component({
   selector: 'app-public-layout',
@@ -24,10 +25,18 @@ import { TenantService, tenantSlugFromSnapshot } from '../../features/public-por
     LocaleSwitcher,
   ],
   template: `
-    <mat-sidenav-container class="portal">
+    <mat-sidenav-container
+      class="portal"
+      [style.--mat-sys-primary]="brandColor()"
+      [style.--mat-sys-on-primary]="brandOnColor()"
+    >
       <mat-sidenav #snav mode="over" class="portal__sidenav" opened="false">
         <div class="portal__sidenav-header">
-          <span class="portal__mark">{{ brandInitial() }}</span>
+          @if (hasLogo()) {
+            <img class="portal__logo" [src]="logoUrl()" [alt]="tenant()?.name" />
+          } @else {
+            <span class="portal__mark">{{ brandInitial() }}</span>
+          }
           <strong>{{ tenant()?.name }}</strong>
         </div>
         <mat-divider />
@@ -63,7 +72,11 @@ import { TenantService, tenantSlugFromSnapshot } from '../../features/public-por
             </button>
 
             <a class="portal__brand" [routerLink]="['/', tenant()?.slug]">
-              <span class="portal__mark">{{ brandInitial() }}</span>
+              @if (hasLogo()) {
+                <img class="portal__logo" [src]="logoUrl()" [alt]="tenant()?.name" />
+              } @else {
+                <span class="portal__mark">{{ brandInitial() }}</span>
+              }
               <span class="portal__name">{{ tenant()?.name }}</span>
             </a>
 
@@ -112,7 +125,11 @@ import { TenantService, tenantSlugFromSnapshot } from '../../features/public-por
           <div class="portal__footer-inner">
             <div>
               <div class="portal__footer-brand">
-                <span class="portal__mark">{{ brandInitial() }}</span>
+                @if (hasLogo()) {
+                  <img class="portal__logo" [src]="logoUrl()" [alt]="tenant()?.name" />
+                } @else {
+                  <span class="portal__mark">{{ brandInitial() }}</span>
+                }
                 <strong>{{ tenant()?.name }}</strong>
               </div>
               <p class="portal__footer-about">{{ 'footer.about' | translate }}</p>
@@ -131,6 +148,9 @@ import { TenantService, tenantSlugFromSnapshot } from '../../features/public-por
   styles: `
     .portal {
       height: 100vh;
+      --tenant-brand: var(--mat-sys-primary);
+      --mat-sys-primary-container: color-mix(in srgb, var(--tenant-brand) 16%, white);
+      --mat-sys-on-primary-container: color-mix(in srgb, var(--tenant-brand) 55%, black);
     }
 
     .portal__sidenav {
@@ -160,6 +180,7 @@ import { TenantService, tenantSlugFromSnapshot } from '../../features/public-por
       position: sticky;
       top: 0;
       z-index: 10;
+      border-top: 3px solid var(--tenant-brand);
       background: color-mix(in srgb, var(--mat-sys-surface) 88%, transparent);
       backdrop-filter: blur(8px);
       border-bottom: 1px solid var(--mat-sys-outline-variant);
@@ -193,13 +214,25 @@ import { TenantService, tenantSlugFromSnapshot } from '../../features/public-por
       width: 40px;
       height: 40px;
       border-radius: 12px;
-      background: var(--mat-sys-primary);
+      background: var(--tenant-brand);
       color: var(--mat-sys-on-primary);
       display: inline-flex;
       align-items: center;
       justify-content: center;
       font-weight: 800;
       font-size: 20px;
+      flex: none;
+    }
+
+    .portal__logo {
+      width: 40px;
+      height: 40px;
+      border-radius: 12px;
+      object-fit: contain;
+      background: #ffffff;
+      padding: 4px;
+      box-sizing: border-box;
+      border: 1px solid var(--mat-sys-outline-variant);
       flex: none;
     }
 
@@ -222,7 +255,8 @@ import { TenantService, tenantSlugFromSnapshot } from '../../features/public-por
     }
 
     .portal__nav-active {
-      background: var(--mat-sys-secondary-container, transparent);
+      background: color-mix(in srgb, var(--tenant-brand) 14%, transparent);
+      color: var(--tenant-brand);
     }
 
     .portal__actions {
@@ -285,7 +319,7 @@ import { TenantService, tenantSlugFromSnapshot } from '../../features/public-por
     }
 
     .portal__footer-link {
-      color: var(--mat-sys-primary);
+      color: var(--tenant-brand);
       cursor: pointer;
     }
   `,
@@ -297,7 +331,21 @@ export class PublicLayout implements OnInit {
 
   protected readonly tenant = this.tenants.currentTenant;
   protected readonly brandInitial = computed(() => (this.tenant()?.name ?? 'R').charAt(0).toUpperCase());
+  protected readonly brandColor = computed(() => normalizeBrandColor(this.tenant()?.brandColor));
+  protected readonly brandOnColor = computed(() =>
+    this.brandColor() ? contrastColor(this.brandColor()!) : null,
+  );
+  protected readonly logoUrl = computed(() => this.tenant()?.logoUrl ?? null);
+  protected readonly logoFailed = signal(false);
+  protected readonly hasLogo = computed(() => !!this.logoUrl());
   protected readonly year = new Date().getFullYear();
+
+  constructor() {
+    effect(() => {
+      this.tenant()?.logoUrl;
+      this.logoFailed.set(false);
+    });
+  }
 
   protected readonly navLinks = [
     { label: 'header.nav_services', fragment: 'servicios' },

@@ -121,6 +121,10 @@ export class TenantMongoRepository implements TenantRepository {
       ...(tenant.settings.whatsappPhoneNumberId
         ? { whatsapp_phone_number_id: tenant.settings.whatsappPhoneNumberId }
         : {}),
+      ...(tenant.settings.bookingMode ? { booking_mode: tenant.settings.bookingMode } : {}),
+      ...(tenant.settings.capacityPerSlot
+        ? { capacity_per_slot: bsonInt(tenant.settings.capacityPerSlot) }
+        : {}),
     };
     const doc = auditCreate(
       {
@@ -136,8 +140,9 @@ export class TenantMongoRepository implements TenantRepository {
         city: tenant.city,
         tagline: tenant.tagline,
         description: tenant.description,
-        logo_url: tenant.logoUrl,
-        cover_url: tenant.coverUrl,
+        logo_url: tenant.logoUrl ?? null,
+        cover_url: tenant.coverUrl ?? null,
+        brand_color: tenant.brandColor ?? null,
         address: tenant.address,
         phone: tenant.phone,
         settings,
@@ -171,8 +176,9 @@ export class TenantMongoRepository implements TenantRepository {
         city: tenant.city,
         address: tenant.address,
         phone: tenant.phone,
-        logo_url: tenant.logoUrl,
-        cover_url: tenant.coverUrl,
+        logo_url: tenant.logoUrl ?? null,
+        cover_url: tenant.coverUrl ?? null,
+        brand_color: tenant.brandColor ?? null,
         booking_status: tenant.bookingStatus,
       },
       actor,

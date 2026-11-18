@@ -41,3 +41,36 @@ body {
     --mat-snack-bar-button-color: #fff;
   }
 }
+
+/* Mensajes de SweetAlert2 alineados con el tema de ReservaYa. */
+.ry-swal {
+  border-radius: 20px;
+  font-family: Roboto, 'Helvetica Neue', sans-serif;
+  padding: 1.75rem;
+}
+
+.ry-swal .swal2-title {
+  color: var(--mat-sys-on-surface);
+  font-size: 1.3rem;
+  font-weight: 600;
+}
+
+.ry-swal .swal2-html-container {
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.ry-swal__lead {
+  margin: 0 0 0.65rem;
+}
+
+.ry-swal__list {
+  display: grid;
+  gap: 0.35rem;
+  margin: 0;
+  padding-left: 1.1rem;
+  text-align: left;
+}
+
+.ry-swal__list li {
+  line-height: 1.45;
+}

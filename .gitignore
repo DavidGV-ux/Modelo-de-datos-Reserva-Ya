@@ -55,3 +55,8 @@ Thumbs.db
 
 # Infraestructura con credenciales reales de Keycloak (se mantiene solo local)
 Codigo/Front/deploy/
+
+# Guía privada y scripts de despliegue (no subir)
+PROJECT_GUIDE.md
+deploy-scripts/
+graphify-out/

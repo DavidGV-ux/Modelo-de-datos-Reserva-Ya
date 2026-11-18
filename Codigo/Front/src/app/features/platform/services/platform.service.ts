@@ -106,6 +106,7 @@ export class PlatformService {
     tagline?: string;
     description?: string;
     country?: string;
+    city?: string;
     currency?: 'COP' | 'USD';
     phone?: string;
     address?: string;

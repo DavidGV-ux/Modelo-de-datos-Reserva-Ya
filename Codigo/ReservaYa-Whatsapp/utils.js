@@ -50,6 +50,19 @@ class Utils {
 
   static validateWhatsAppMessage(body) {
     if (!body?.entry?.[0]?.changes?.[0]?.value) return { valid: false, error: 'invalid structure' };
+    // Validate message type and size
+    const value = body.entry[0].changes[0].value;
+    if (value.messages && Array.isArray(value.messages)) {
+      for (const msg of value.messages) {
+        if (typeof msg !== 'object' || !msg.id) return { valid: false, error: 'invalid message' };
+        if (msg.text?.body && (typeof msg.text.body !== 'string' || msg.text.body.length > 4096)) {
+          return { valid: false, error: 'message body too long' };
+        }
+      }
+    }
+    // Limit total body size
+    const bodyStr = JSON.stringify(body);
+    if (bodyStr.length > 100000) return { valid: false, error: 'payload too large' };
     return { valid: true };
   }
 
@@ -94,9 +107,12 @@ class Utils {
    * (list_reply / button_reply). Los statuses (receipts) se ignoran.
    */
   static extractMessageInfo(body) {
+    if (!Array.isArray(body?.entry) || body.entry.length === 0) return null;
     const entry = body.entry[0];
+    if (!entry?.changes || !Array.isArray(entry.changes) || entry.changes.length === 0) return null;
     const changes = entry.changes[0];
-    const value = changes.value;
+    const value = changes?.value;
+    if (!value) return null;
 
     const message = value.messages?.[0];
     if (!message) {

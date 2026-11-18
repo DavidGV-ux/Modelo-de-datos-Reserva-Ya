@@ -1,5 +1,4 @@
 import { ChangeDetectionStrategy, Component, OnInit, inject, signal } from '@angular/core';
-import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
@@ -16,7 +15,6 @@ import { MoneyPipe } from '../../../../shared/pipes/money.pipe';
 @Component({
   selector: 'app-history-page',
   imports: [
-    ReactiveFormsModule,
     MatButtonModule,
     MatCardModule,
     MatIconModule,
@@ -34,23 +32,13 @@ import { MoneyPipe } from '../../../../shared/pipes/money.pipe';
 
       @if (!authenticated()) {
         <mat-card class="history__lookup">
-          <form [formGroup]="lookupForm" class="history__lookup-form" (ngSubmit)="search()">
-            <mat-form-field appearance="outline">
-              <mat-label>{{ 'booking.contact_phone' | translate }}</mat-label>
-              <input matInput formControlName="phone" autocomplete="tel" placeholder="+57 300 000 0000" />
-            </mat-form-field>
-            <mat-form-field appearance="outline">
-              <mat-label>{{ 'booking.contact_document' | translate }}</mat-label>
-              <input matInput formControlName="documentId" autocomplete="off" />
-            </mat-form-field>
-            <button mat-flat-button class="history__lookup-submit" [disabled]="lookupForm.invalid">
-              {{ 'history.search' | translate }}
-            </button>
-          </form>
-          <p class="history__lookup-note">
-            <mat-icon>info</mat-icon>
-            <span>{{ 'history.lookup_note' | translate }}</span>
-          </p>
+          <div class="history__lookup-note">
+            <mat-icon>lock</mat-icon>
+            <span>{{ 'history.login_required' | translate }}</span>
+          </div>
+          <button mat-flat-button color="primary" (click)="login()">
+            {{ 'history.login_cta' | translate }}
+          </button>
         </mat-card>
       }
 
@@ -244,12 +232,7 @@ export class HistoryPage implements OnInit {
   protected readonly tenant = this.tenants.currentTenant;
   protected readonly authenticated = signal(this.auth.isAuthenticated());
 
-  protected readonly lookupForm = new FormGroup({
-    phone: new FormControl('', { nonNullable: true, validators: [Validators.required, Validators.minLength(7)] }),
-    documentId: new FormControl('', { nonNullable: false }),
-  });
-
-  private readonly appts = signal<Appointment[]>([]);
+  protected readonly appts = signal<Appointment[]>([]);
   protected readonly appointments = this.appts.asReadonly();
   private readonly professionals = signal(new Map<string, string>());
 
@@ -263,11 +246,9 @@ export class HistoryPage implements OnInit {
     });
   }
 
-  protected search(): void {
-    const phone = this.lookupForm.controls['phone'].value;
-    const documentId = this.lookupForm.controls['documentId'].value || undefined;
-    if (!phone) return;
-    this.booking.history(phone, documentId).subscribe((list) => this.appts.set(list));
+  /** El historial requiere sesión: el backend solo expone las citas del usuario autenticado. */
+  protected login(): void {
+    this.auth.login().subscribe({ error: () => undefined });
   }
 
   protected professionalName(id: string): string {

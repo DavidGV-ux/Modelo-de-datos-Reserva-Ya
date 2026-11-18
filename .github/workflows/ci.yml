@@ -17,6 +17,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
+    # Los tests unitarios usan Mongo real en localhost:27017.
+    services:
+      mongodb:
+        image: mongo:7
+        ports:
+          - 27017:27017
+
     # Todos los comandos se ejecutan dentro del backend.
     defaults:
       run:

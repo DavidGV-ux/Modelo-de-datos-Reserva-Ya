@@ -357,6 +357,7 @@ function defaultRouteFor(role: BusinessRole): string {
 const MENU: Record<PanelId, MenuLink[]> = {
   owner: [
     { label: 'dashboard.menu_overview', route: '/app/owner', icon: 'dashboard' },
+    { label: 'dashboard.menu_personalization', route: '/app/owner/personalizacion', icon: 'palette' },
     { label: 'dashboard.menu_appointments', route: '/app/owner/citas', icon: 'event_note' },
     { label: 'dashboard.menu_payments', route: '/app/owner/pagos', icon: 'payments' },
     { label: 'dashboard.menu_services', route: '/app/owner/services', icon: 'content_cut' },

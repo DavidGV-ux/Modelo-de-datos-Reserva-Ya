@@ -118,6 +118,10 @@ import { CompleteProfileDialog } from '../../features/platform/components/comple
                   <mat-icon>person</mat-icon>
                   <span>{{ 'landing.go_client_dashboard' | translate }}</span>
                 </button>
+                <button mat-stroked-button class="platform__cta" (click)="logout()">
+                  <mat-icon>logout</mat-icon>
+                  <span>{{ 'common.logout' | translate }}</span>
+                </button>
               } @else {
                 <button mat-flat-button class="platform__cta" (click)="login()">
                   {{ 'common.login' | translate }}
@@ -284,6 +288,35 @@ import { CompleteProfileDialog } from '../../features/platform/components/comple
         display: none;
       }
     }
+
+    @media (max-width: 480px) {
+      .platform__header-inner {
+        gap: 8px;
+        padding: 8px 12px;
+      }
+      .platform__menu {
+        width: 44px;
+        height: 44px;
+        padding: 10px;
+      }
+      .platform__brand {
+        min-width: 44px;
+        min-height: 44px;
+        justify-content: center;
+      }
+      .platform__mark {
+        width: 36px;
+        height: 36px;
+      }
+      .platform__actions {
+        gap: 4px;
+      }
+      .platform__actions .platform__cta {
+        min-width: 0;
+        min-height: 44px;
+        padding: 0 12px;
+      }
+    }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
@@ -357,5 +390,9 @@ export class PlatformLayout {
     void this.auth.login().subscribe((ok) => {
       if (ok) void this.router.navigateByUrl('/');
     });
+  }
+
+  protected logout(): void {
+    this.auth.logout();
   }
 }

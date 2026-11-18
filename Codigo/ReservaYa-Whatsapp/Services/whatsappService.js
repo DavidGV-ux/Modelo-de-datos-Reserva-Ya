@@ -45,13 +45,24 @@ class WhatsAppService {
    * Envía una plantilla aprobada. Es obligatoria para iniciar conversación con
    * un número que nunca ha escrito al negocio (regla de 24 horas de Meta).
    */
-  async sendTemplate(to, name, language, bodyParameters = []) {
+  async sendTemplate(to, name, language, bodyParameters = [], options = {}) {
     const components = bodyParameters.length
       ? [{
           type: 'body',
           parameters: bodyParameters.map((text) => ({ type: 'text', text: String(text) })),
         }]
-      : undefined;
+      : [];
+    // Las plantillas de autenticación con botón "Copiar código" exigen el
+    // código también como parámetro del botón (sub_type url, índice 0).
+    if (options.otpButton) {
+      const code = bodyParameters[0] ?? '';
+      components.push({
+        type: 'button',
+        sub_type: 'url',
+        index: '0',
+        parameters: [{ type: 'text', text: String(code) }],
+      });
+    }
     return this.post('/messages', {
       messaging_product: 'whatsapp',
       to: this.sanitizeTo(to),
@@ -59,9 +70,37 @@ class WhatsAppService {
       template: {
         name,
         language: { code: language },
-        ...(components ? { components } : {}),
+        ...(components.length ? { components } : {}),
       },
     });
+  }
+
+  async sendVerificationCodeViaFyn({ phone, code, name }) {
+    const url = process.env.FYN_SEND_URL;
+    if (!url) {
+      throw new Error('FYN_SEND_URL no configurado');
+    }
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 8000);
+    try {
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          // Compatibilidad: ambos bots (FYN y ReservaYa) deben desplegarse juntos con la misma INTERNAL_SERVICE_SECRET.
+          'x-internal-secret': process.env.INTERNAL_SERVICE_SECRET || '',
+        },
+        body: JSON.stringify({
+          type: 'user.verify-code',
+          user: { name: name || undefined, phone, code },
+        }),
+        signal: controller.signal,
+      });
+      if (!response.ok) throw new Error(`FYN send failed (${response.status})`);
+      return true;
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   async sendButtons(to, body, buttons) {

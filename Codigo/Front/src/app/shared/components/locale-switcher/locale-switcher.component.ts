@@ -56,6 +56,22 @@ import { LanguageService, SUPPORTED_LANGUAGES } from '../../../core/i18n/languag
     .locale-switcher__active {
       font-weight: 700;
     }
+
+    @media (max-width: 480px) {
+      .locale-switcher {
+        min-width: 44px;
+        min-height: 44px;
+        padding: 0 8px;
+      }
+
+      .locale-switcher__code {
+        margin-left: 4px;
+      }
+
+      .locale-switcher__caret {
+        display: none;
+      }
+    }
   `,
   changeDetection: ChangeDetectionStrategy.OnPush,
 })
