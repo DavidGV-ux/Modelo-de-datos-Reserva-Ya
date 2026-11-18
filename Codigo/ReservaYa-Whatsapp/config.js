@@ -24,6 +24,8 @@ module.exports = {
     // a un usuario que nunca ha escrito al negocio (ventana de 24 horas).
     welcomeTemplate: process.env.WHATSAPP_WELCOME_TEMPLATE || 'bienvenida_reservaya',
     welcomeTemplateLang: process.env.WHATSAPP_WELCOME_TEMPLATE_LANG || 'es',
+    codeTemplate: process.env.WHATSAPP_CODE_TEMPLATE || 'codigo_verificacion',
+    codeTemplateLang: process.env.WHATSAPP_CODE_TEMPLATE_LANG || 'es',
   },
 
   // fyn (canal/transporte Live del 315): reenviamos sus eventos intactos para
@@ -31,6 +33,9 @@ module.exports = {
   fyn: {
     webhookUrl: process.env.FYN_WEBHOOK_URL || '',
     phoneId: process.env.FYN_PHONE_ID || '890472847487137',
+    // Endpoint al que el bot de FYN recibe los eventos internos de envío
+    // (p. ej. user.verify-code) para responder por su propio canal.
+    sendUrl: process.env.FYN_SEND_URL || '',
   },
 
   // Groq IA

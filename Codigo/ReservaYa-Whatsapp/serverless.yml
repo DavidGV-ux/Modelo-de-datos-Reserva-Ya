@@ -1,6 +1,10 @@
 # servicio independiente ReservaYa-Whatsapp (no interfiere con otras lambdas)
 service: reserva-ya-whatsapp
 
+# Cargar .env con la función nativa de Serverless (el plugin por sí solo no
+# resolvió ${env:...} en `serverless print` y bloqueó el deploy).
+useDotenv: true
+
 plugins:
   - serverless-dotenv-plugin
 
@@ -15,15 +19,25 @@ provider:
     WHATSAPP_PHONE_ID: ${env:WHATSAPP_PHONE_ID, ''}
     WHATSAPP_TOKEN: ${env:WHATSAPP_TOKEN, ''}
     WHATSAPP_VERIFY_TOKEN: ${env:WHATSAPP_VERIFY_TOKEN, ''}
-    WHATSAPP_APP_SECRET: ${env:WHATSAPP_APP_SECRET, ''}
+    WHATSAPP_APP_SECRET: ${env:WHATSAPP_APP_SECRET}
     WHATSAPP_APP_SECRET_ALT: ${env:WHATSAPP_APP_SECRET_ALT, ''}
+    # Debe coincidir con el mismo valor desplegado en whatsapp-chatbot (FYN).
+    INTERNAL_SERVICE_SECRET: ${env:INTERNAL_SERVICE_SECRET}
     WHATSAPP_WELCOME_TEMPLATE: ${env:WHATSAPP_WELCOME_TEMPLATE, 'bienvenida_reservaya'}
     WHATSAPP_WELCOME_TEMPLATE_LANG: ${env:WHATSAPP_WELCOME_TEMPLATE_LANG, 'es'}
+    WHATSAPP_CODE_TEMPLATE: ${env:WHATSAPP_CODE_TEMPLATE, 'codigo_verificacion'}
+    WHATSAPP_CODE_TEMPLATE_LANG: ${env:WHATSAPP_CODE_TEMPLATE_LANG, 'es'}
     FYN_WEBHOOK_URL: ${env:FYN_WEBHOOK_URL, ''}
     FYN_PHONE_ID: ${env:FYN_PHONE_ID, '890472847487137'}
+    FYN_SEND_URL: ${env:FYN_SEND_URL, ''}
     WHATSAPP_API_URL: ${env:WHATSAPP_API_URL, 'https://graph.facebook.com/v21.0'}
     GROQ_API_KEY: ${env:GROQ_API_KEY, ''}
     GROQ_MODEL: ${env:GROQ_MODEL, 'llama-3.3-70b-versatile'}
+    GROQ_MAX_TOKENS: ${env:GROQ_MAX_TOKENS, '200'}
+    GROQ_TEMPERATURE: ${env:GROQ_TEMPERATURE, '0.1'}
+    GROQ_INTENT_TIMEOUT_MS: ${env:GROQ_INTENT_TIMEOUT_MS, '8000'}
+    PORT: ${env:PORT, '3000'}
+    RESERVAYA_TIMEOUT_MS: ${env:RESERVAYA_TIMEOUT_MS, '10000'}
     RESERVAYA_API_URL: ${env:RESERVAYA_API_URL, ''}
     RESERVAYA_BOT_SECRET: ${env:RESERVAYA_BOT_SECRET, ''}
     RESERVAYA_EVENTS_TOKEN: ${env:RESERVAYA_EVENTS_TOKEN, ''}

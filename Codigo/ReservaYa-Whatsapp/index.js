@@ -5,6 +5,7 @@ const Utils = require('./utils');
 const whatsappService = require('./Services/whatsappService');
 const orchestrator = require('./Services/orchestrator');
 const dbService = require('./Services/dbService');
+const reservayaApi = require('./Services/reservaYaApi');
 const { notifyNewAppointment } = require('./Services/notifyService');
 
 const app = express();
@@ -44,6 +45,7 @@ app.post('/webhook', async (req, res) => {
   if (!validation.valid) return res.status(200).send('REJECTED');
 
   const info = Utils.extractMessageInfo(req.body);
+  if (!info) return res.status(200).send('REJECTED');
 
   // Multi-número: solo atendemos los eventos de NUEStro número (phone id del
   // 312). Los eventos de otros números (315 de fyn, etc.) se reenVIAN intactos
@@ -72,6 +74,48 @@ app.post('/webhook', async (req, res) => {
   }
 
   whatsappService.markRead(info.from).catch(() => {});
+
+  // Verificación por mensaje entrante: si el usuario envía un texto con un
+  // código de 6 dígitos (p. ej. vía deep link de WhatsApp Web), se delega al
+  // Back para validar y habilitar la cuenta.
+  const { matchVerificationCode } = require('./audit-helpers');
+  const codeMatch = info.isEmpty || info.hasStatus ? null : matchVerificationCode(info.messageBody);
+  if (codeMatch) {
+    try {
+      const verifyResp = await reservayaApi.client.post(
+        '/public/whatsapp/verify-code',
+        { phone: info.from, code: codeMatch[0] },
+        {
+          headers: {
+            'content-type': 'application/json',
+            ...(config.reservaYa.botSecret ? { 'x-whatsapp-secret': config.reservaYa.botSecret } : {}),
+          },
+          timeout: config.reservaYa.requestTimeoutMs,
+        },
+      );
+      if (verifyResp.data?.ok) {
+        // Enviar mensaje de confirmación al usuario por WhatsApp
+        try {
+          const phone = info.from;
+          const welcomeMessage =
+            `✅ *Cuenta verificada*\n\n` +
+            `Tu número de WhatsApp ha sido verificado correctamente.\n\n` +
+            `Ya puedes iniciar sesión en ReservaYa con tu correo electrónico y contraseña.\n\n` +
+            `¡Gracias por registrarte! 🎉`;
+          await whatsappService.sendMessage(phone, welcomeMessage);
+          Utils.log('info', `Mensaje de bienvenida enviado a ${phone} tras verificación`);
+        } catch (welcomeErr) {
+          Utils.log('warn', `No se pudo enviar bienvenida a ${info.from}: ${welcomeErr.message}`);
+        }
+      }
+      Utils.log('info', `user.code-received desde whatsapp: ${info.from} (ok=${verifyResp.data?.ok})`);
+      return res.status(200).send('ok');
+    } catch (err) {
+      Utils.log('error', `user.code-received verify failed: ${err.message}`);
+      return res.status(502).send('verify-code failed');
+    }
+  }
+
   // IMPORTANTE: esperamos el procesamiento antes de responder. Si se responde
   // al HTTP API sin esperar, el runtime congela el loop de eventos y el bot
   // no llega a atender el mensaje.
@@ -145,6 +189,74 @@ app.post('/internal/events', async (req, res) => {
 
   // El usuario completo su perfil web (teléfono + ciudad): le enviamos la
   // invitación a usar el servicio por WhatsApp con asistente de IA.
+  // Envía el código de 6 dígitos para verificar el número del usuario recién
+  // registrado. Mensaje predefinido (sin IA): se envía tal cual.
+  if (event === 'user.verify-code') {
+    const user = req.body?.user || {};
+    const phone = Utils.normalizePhoneE164(user.phone);
+    if (!phone) {
+      return res.status(400).send('invalid user phone');
+    }
+    const code = String(user.code ?? '').trim();
+    if (!/^\d{6}$/.test(code)) {
+      return res.status(400).send('invalid code');
+    }
+    try {
+      const name = user.name ? `Hola *${user.name}* 👋` : 'Hola 👋';
+      const channel = String(user.channel || 'reservaya');
+      let sentWithTemplate = false;
+      let sentWithText = false;
+      let sentViaFyn = false;
+
+      // Canal alternativo: enviar el código vía el bot de FYN (no depende de
+      // la aprobación de plantillas de Meta para el primer contacto).
+      if (channel === 'fyn') {
+        try {
+          sentViaFyn = await whatsappService.sendVerificationCodeViaFyn({ phone, code, name });
+        } catch (fynErr) {
+          Utils.log('warn', `user.verify-code via FYN fallo: ${fynErr.message}`);
+        }
+      }
+
+      if (!sentViaFyn) {
+        if (config.whatsapp.codeTemplate) {
+          try {
+            await whatsappService.sendTemplate(
+              phone,
+              config.whatsapp.codeTemplate,
+              config.whatsapp.codeTemplateLang,
+              [code],
+              { otpButton: true },
+            );
+            sentWithTemplate = true;
+          } catch (templateErr) {
+            Utils.log('warn', `user.verify-code plantilla fallo: ${templateErr.message}; usando texto libre`);
+          }
+        }
+        if (!sentWithTemplate) {
+          const message =
+            `${name}\n` +
+            `Tu código de verificación de *ReservaYa* es: *${code}*\n\n` +
+            `Ingrésalo en la pantalla de registro para validar tu número. ` +
+            `El código vence en 10 minutos. Si no lo solicitaste, ignora este mensaje.`;
+          await whatsappService.sendMessage(phone, message);
+          sentWithText = true;
+        }
+      }
+
+      const delivered = sentViaFyn || sentWithTemplate || sentWithText;
+      if (delivered) {
+        Utils.log('info', `user.verify-code enviado a ${phone} (canal ${channel})${sentViaFyn ? ' (fyn)' : sentWithTemplate ? ' (plantilla)' : ' (texto)'}`);
+        return res.status(200).send('ok');
+      }
+      Utils.log('error', `user.verify-code no se pudo enviar a ${phone} (canal ${channel})`);
+      return res.status(502).send('verify-code failed');
+    } catch (err) {
+      Utils.log('error', `user.verify-code: ${err.message}`);
+      return res.status(502).send('verify-code failed');
+    }
+  }
+
   if (event === 'user.invite') {
     const user = req.body?.user || {};
     const phone = Utils.normalizePhoneE164(user.phone);
