@@ -203,25 +203,19 @@ export class BookingService {
     return of(cancelled).pipe(delay(200));
   }
 
-  history(clientPhone?: string, clientDocument?: string): Observable<Appointment[]> {
+  /** Historial del usuario autenticado (el endpoint exige JWT: H-A08). */
+  history(): Observable<Appointment[]> {
     if (!environment.useMockBackend) {
       const tenantId = this.tenants.currentTenant()?.tenantId;
       if (!tenantId) return of([]);
-      const params = new URLSearchParams();
-      if (clientPhone) params.set('phone', clientPhone);
-      if (clientDocument) params.set('documentId', clientDocument);
-      const qs = params.toString();
       return this.api
-        .get<BackendAppointment[]>(`/public/${tenantId}/appointments/history${qs ? `?${qs}` : ''}`)
+        .get<BackendAppointment[]>(`/public/${tenantId}/appointments/history`)
         .pipe(map((list) => list.map(mapAppointment)));
     }
 
     const all = [...this.sessionAppointments(), ...MOCK_APPOINTMENTS];
-    const filtered = clientPhone
-      ? all.filter((a) => a.clientInfo.phone === clientPhone)
-      : all;
     return of(
-      filtered.sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime()),
+      all.sort((a, b) => new Date(b.startTime).getTime() - new Date(a.startTime).getTime()),
     );
   }
 

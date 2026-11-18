@@ -8,7 +8,7 @@ export const environment = {
     clientId: 'reserwaya-web',
     scope: 'openid profile email roles',
     redirectUri: 'http://localhost:4200/auth/callback',
-    postLogoutRedirectUri: 'http://localhost:4200',
+    postLogoutRedirectUri: 'http://localhost:4200/',
     responseType: 'code',
     sessionChecksEnabled: false,
     timeOut: 1_800_000,

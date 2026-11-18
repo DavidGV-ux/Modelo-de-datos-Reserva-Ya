@@ -32,6 +32,7 @@ export interface Tenant {
   currency: Currency;
   logoUrl?: string;
   coverUrl?: string;
+  brandColor?: string;
   address?: string;
   phone?: string;
   settings: TenantConfig;

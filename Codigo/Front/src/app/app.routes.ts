@@ -65,6 +65,14 @@ export const routes: Routes = [
           import('./features/owner/pages/services-mgmt/services.page').then((m) => m.OwnerServicesPage),
       },
       {
+        path: 'owner/personalizacion',
+        canActivate: [requireRoles([USER_ROLES.OWNER])],
+        loadComponent: () =>
+          import('./features/owner/pages/personalization/personalization.page').then(
+            (m) => m.OwnerPersonalizationPage,
+          ),
+      },
+      {
         path: 'owner/professionals',
         canActivate: [requireRoles([USER_ROLES.OWNER])],
         loadComponent: () =>

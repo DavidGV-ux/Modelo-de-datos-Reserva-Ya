@@ -52,6 +52,23 @@ import { MoneyPipe } from '../../../../shared/pipes/money.pipe';
       </div>
     </section>
 
+    @if (tenant()?.logoUrl) {
+      <section class="brand-showcase">
+        <div class="brand-showcase__card">
+          <div class="brand-showcase__texture" [style.background-image]="logoTexture()"></div>
+          <div class="brand-showcase__overlay"></div>
+          <div class="brand-showcase__content">
+            <span class="brand-showcase__eyebrow">{{ 'home.brand_eyebrow' | translate }}</span>
+            <h2>{{ 'home.brand_title' | translate }}</h2>
+            <p>{{ 'home.brand_subtitle' | translate }}</p>
+            <a mat-flat-button [routerLink]="['/', tenant()?.slug, 'reservar']">
+              {{ 'home.brand_cta' | translate }}
+            </a>
+          </div>
+        </div>
+      </section>
+    }
+
     <section id="servicios" class="section">
       <div class="section__head">
         <h2>{{ 'home.services_title' | translate }}</h2>
@@ -211,6 +228,73 @@ import { MoneyPipe } from '../../../../shared/pipes/money.pipe';
       font-weight: 700;
     }
 
+    .brand-showcase {
+      max-width: 1200px;
+      margin: 0 auto 24px;
+      padding: 0 20px;
+    }
+
+    .brand-showcase__card {
+      position: relative;
+      border-radius: 28px;
+      overflow: hidden;
+      min-height: 260px;
+      background: var(--tenant-brand, var(--mat-sys-primary));
+      display: flex;
+      align-items: center;
+      padding: 32px 28px;
+      box-shadow: 0 24px 60px -32px color-mix(in srgb, var(--tenant-brand, var(--mat-sys-primary)) 70%, transparent);
+    }
+
+    .brand-showcase__texture {
+      position: absolute;
+      inset: -10%;
+      background-repeat: repeat;
+      background-size: 96px 96px;
+      opacity: 0.16;
+      filter: grayscale(1) brightness(2.2);
+      transform: rotate(-8deg);
+      pointer-events: none;
+    }
+
+    .brand-showcase__overlay {
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(115deg, color-mix(in srgb, var(--tenant-brand, var(--mat-sys-primary)) 88%, #000000) 0%, color-mix(in srgb, var(--tenant-brand, var(--mat-sys-primary)) 55%, #000000) 100%);
+      opacity: 0.72;
+      pointer-events: none;
+    }
+
+    .brand-showcase__content {
+      position: relative;
+      z-index: 1;
+      color: var(--mat-sys-on-primary);
+      max-width: 520px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+
+      h2 {
+        margin: 0;
+        font-size: 32px;
+        letter-spacing: -0.02em;
+      }
+
+      p {
+        margin: 0;
+        opacity: 0.9;
+        max-width: 420px;
+      }
+    }
+
+    .brand-showcase__eyebrow {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      opacity: 0.8;
+    }
+
     .section {
       max-width: 1200px;
       margin: 0 auto;
@@ -363,6 +447,11 @@ export class HomePage implements OnInit {
   private readonly seo = inject(SeoService);
 
   protected readonly tenant = this.tenants.currentTenant;
+
+  protected readonly logoTexture = computed(() => {
+    const url = this.tenant()?.logoUrl;
+    return url ? `url("${url}")` : 'none';
+  });
 
   private readonly servicesList = signal<Service[]>([]);
   private readonly professionalsList = signal<Professional[]>([]);

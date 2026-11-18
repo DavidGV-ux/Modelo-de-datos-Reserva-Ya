@@ -1,3 +1,4 @@
+import { environment } from '../config/environment';
 import {
   Appointment,
   AppointmentSource,
@@ -29,6 +30,7 @@ export interface BackendTenant {
   currency?: string;
   logoUrl?: string;
   coverUrl?: string;
+  brandColor?: string;
   address?: string;
   phone?: string;
   settings?: BackendTenantConfig;
@@ -106,7 +108,7 @@ export function mapTenant(t: BackendTenant): Tenant {
     description: t.description ?? '',
     timezone: t.timezone,
     currency,
-    logoUrl: t.logoUrl,
+    logoUrl: resolveAssetUrl(t.logoUrl),
     coverUrl: t.coverUrl,
     address: t.address,
     phone: t.phone,
@@ -121,6 +123,7 @@ export function mapTenant(t: BackendTenant): Tenant {
     },
     bookingStatus: t.bookingStatus,
     version: t.version ?? 1,
+    brandColor: normalizeBrandColor(t.brandColor),
   };
 }
 
@@ -160,6 +163,21 @@ function mapClientInfo(c?: BackendClientInfo): ClientInfo {
     habeasDataConsent: Boolean(c?.habeasDataConsent ?? acceptedAt),
     habeasDataConsentAt: acceptedAt,
   };
+}
+
+function resolveAssetUrl(url?: string): string | undefined {
+  if (!url) return undefined;
+  const trimmed = url.trim();
+  if (!trimmed) return undefined;
+  if (/^(https?:|data:|blob:|\/\/)/i.test(trimmed)) return trimmed;
+  const base = environment.apiBaseUrl.replace(/\/$/, '');
+  return `${base}${trimmed.startsWith('/') ? '' : '/'}${trimmed}`;
+}
+
+function normalizeBrandColor(value?: string): string | undefined {
+  if (!value) return undefined;
+  const trimmed = value.trim().toLowerCase();
+  return /^#[0-9a-f]{6}$/.test(trimmed) ? trimmed : undefined;
 }
 
 export interface TenantMembership {
