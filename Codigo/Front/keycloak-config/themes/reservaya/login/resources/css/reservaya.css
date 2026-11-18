@@ -1,0 +1,373 @@
+/* ==========================================================================
+   Login / Registro ReservaYa (Keycloak login theme) — capa de marca sobre Bootstrap 5.
+   Bootstrap se carga primero (css/bootstrap.min.css); aquí se re-tema con la
+   identidad verde de ReservaYa y se pulen los detalles propios.
+   ========================================================================== */
+
+:root {
+  --ry-primary: #15803d;
+  --ry-primary-hover: #166534;
+  --ry-primary-soft: #f0fdf4;
+  --ry-surface: #ffffff;
+  --ry-bg: #f2f7f1;
+  --ry-text: #1f2933;
+  --ry-text-muted: #5f6b7a;
+  --ry-border: #e2e8f0;
+  --ry-danger: #dc2626;
+  --ry-danger-soft: #fef2f2;
+  --ry-warning: #b45309;
+  --ry-warning-soft: #fffbeb;
+  --ry-info: #0369a1;
+  --ry-info-soft: #f0f9ff;
+  --ry-success: #15803d;
+  --ry-success-soft: #f0fdf4;
+  --ry-radius: 16px;
+
+  /* Bootstrapeo de componentes con la paleta ReservaYa */
+  --bs-primary: #15803d;
+  --bs-primary-rgb: 21, 128, 61;
+  --bs-link-color-rgb: 21, 128, 61;
+  --bs-link-hover-color-rgb: 22, 101, 52;
+  --bs-body-color: #1f2933;
+  --bs-body-font-family: Roboto, -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --bs-border-color: #e2e8f0;
+  --bs-btn-border-radius: 0.7rem;
+  --bs-btn-border-radius-sm: 0.5rem;
+  --bs-btn-border-radius-lg: 0.7rem;
+  --bs-btn-primary-bg: #15803d;
+  --bs-btn-primary-border-color: #15803d;
+  --bs-btn-primary-hover-bg: #166534;
+  --bs-btn-primary-hover-border-color: #166534;
+  --bs-btn-primary-active-bg: #14532d;
+  --bs-btn-primary-active-border-color: #14532d;
+  --bs-btn-primary-disabled-bg: #86efac;
+  --bs-btn-primary-disabled-border-color: #86efac;
+  --bs-btn-focus-box-shadow: 0 0 0 0.25rem rgba(21, 128, 61, 0.2);
+  --bs-focus-ring-color: rgba(21, 128, 61, 0.25);
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+}
+
+.ry-html, .ry-body {
+  height: 100%;
+}
+
+.ry-body {
+  font-family: Roboto, -apple-system, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  color: var(--ry-text);
+  background:
+    radial-gradient(1100px 600px at 88% -12%, rgba(22, 163, 74, 0.16), transparent 60%),
+    radial-gradient(900px 560px at -8% 108%, rgba(0, 188, 212, 0.12), transparent 55%),
+    linear-gradient(160deg, #eef6ec 0%, #f7faf6 45%, #eef6ec 100%);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Marca */
+.ry-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 11px;
+  text-decoration: none;
+  color: inherit;
+}
+
+.ry-brand:hover .ry-brand__name { color: var(--ry-primary); }
+
+.ry-brand__mark svg {
+  display: block;
+  height: 38px;
+  width: 38px;
+  filter: drop-shadow(0 6px 14px rgba(21, 128, 61, 0.35));
+}
+
+.ry-brand__name {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+/* Tarjeta principal */
+.ry-card {
+  max-width: 420px;
+  background: var(--ry-surface);
+  border-radius: var(--ry-radius) !important;
+}
+
+.ry-card__head { margin-bottom: 4px; }
+
+.ry-card__title { letter-spacing: -0.01em; }
+
+.ry-card__hint {
+  font-size: 13px;
+  color: var(--ry-text-muted);
+}
+
+.ry-required { color: var(--ry-danger); }
+
+.ry-card__body { margin-top: 18px; }
+
+/* Selector de idioma */
+.ry-locale {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.ry-locale__label {
+  position: absolute;
+  left: 12px;
+  display: inline-flex;
+  color: var(--ry-text-muted);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.ry-locale select {
+  width: 100%;
+  appearance: none;
+  padding: 9px 34px 9px 36px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--ry-text-muted);
+  background-color: var(--ry-bg);
+  border: 1px solid var(--ry-border);
+  border-radius: 10px;
+  cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'%3E%3Cpath fill='%235f6b7a' d='M6 8.5 1 3.5h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+}
+
+.ry-locale select:focus {
+  outline: none;
+  border-color: var(--ry-primary);
+  box-shadow: 0 0 0 3px rgba(21, 128, 61, 0.15);
+}
+
+/* Formularios base (Bootstrap form-control/form-label + detalles) */
+.ry-form { display: flex; flex-direction: column; }
+
+.ry-field { display: flex; flex-direction: column; gap: 6px; }
+
+.ry-field--row {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.ry-label-row { gap: 6px; }
+
+.ry-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ry-text);
+}
+
+.ry-input-wrapper { display: flex; flex-direction: column; gap: 6px; }
+
+.ry-input-group { position: relative; }
+
+.ry-input {
+  border-color: var(--ry-border);
+  border-radius: 10px;
+  padding-top: 11px;
+  padding-bottom: 11px;
+  font-size: 15px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ry-input:focus {
+  border-color: var(--ry-primary);
+  box-shadow: 0 0 0 3px rgba(21, 128, 61, 0.15);
+}
+
+.ry-input[aria-invalid="true"] { border-color: var(--ry-danger); }
+
+.ry-error {
+  display: block;
+  margin-top: 2px;
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--ry-danger);
+}
+
+/* Botón mostrar/ocultar contraseña (dentro del input-group de Bootstrap) */
+.ry-input-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  padding: 0;
+  color: var(--ry-text-muted);
+  border-color: var(--ry-border);
+  background-color: var(--ry-surface);
+}
+
+.ry-input-toggle:hover {
+  color: var(--ry-primary);
+  border-color: var(--ry-primary);
+  background-color: var(--ry-primary-soft);
+}
+
+.ry-icon-show::before, .ry-icon-hide::before {
+  content: "";
+  display: block;
+  width: 19px;
+  height: 19px;
+  background-size: 19px 19px;
+}
+
+.ry-icon-show::before { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='currentColor'%3E%3Cpath d='M12 5c-5 0-9.3 2.9-11 7 1.7 4.1 6 7 11 7s9.3-2.9 11-7c-1.7-4.1-6-7-11-7zm0 11.5A4.5 4.5 0 1 1 16.5 12 4.5 4.5 0 0 1 12 16.5zm0-7A2.5 2.5 0 1 0 14.5 12 2.5 2.5 0 0 0 12 9.5z'/%3E%3C/svg%3E"); }
+
+.ry-icon-hide::before { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='currentColor'%3E%3Cpath d='M2 5.3 3.3 4 20 20.7 18.7 22l-3.2-3.2A10.9 10.9 0 0 1 12 19c-5 0-9.3-2.9-11-7 .9-2.2 2.4-4.1 4.3-5.5L2 5.3zM12 9a3.5 3.5 0 0 1 3.9 3.5l-6.4-6.4C10.3 5.9 11.1 9 12 9zm.5 7c-.3 0-.6-.05-.9-.13L9.2 13.4a3.5 3.5 0 0 0 2.3 2.6zm7.4-4.7c-.5 1-1.2 2-2 2.8L12.3 8.5a9 9 0 0 1 1.7-.5A9.5 9.5 0 0 1 19 11.3l.9.9-.9 1v-.4c0-.2 0-.4-.1-.5z'/%3E%3C/svg%3E"); }
+
+/* Opciones / recordar */
+.ry-options__link a {
+  font-size: 13px;
+  color: var(--ry-primary);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.ry-options__link a:hover { text-decoration: underline; }
+
+.checkbox label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.checkbox input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--ry-primary);
+}
+
+/* Botones (Bootstrap btn + marca) */
+.ry-actions__row { display: flex; gap: 10px; }
+
+.btn:focus-visible, .ry-input:focus-visible {
+  outline: 2px solid var(--ry-primary);
+  outline-offset: 2px;
+}
+
+/* Alerta inline (respaldo: visible siempre; theme.js la oculta y muestra SweetAlert2) */
+.ry-alert {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  padding: 11px 13px;
+  margin-top: 16px;
+  border-radius: 10px;
+  font-size: 13.5px;
+  line-height: 1.45;
+  border: 1px solid transparent;
+}
+
+.ry-alert--visible { display: flex; }
+
+.ry-alert--error { background: var(--ry-danger-soft); color: var(--ry-danger); border-color: #fecaca; }
+.ry-alert--warning { background: var(--ry-warning-soft); color: var(--ry-warning); border-color: #fde68a; }
+.ry-alert--info { background: var(--ry-info-soft); color: var(--ry-info); border-color: #bae6fd; }
+.ry-alert--success { background: var(--ry-success-soft); color: var(--ry-success); border-color: #bbf7d0; }
+
+.ry-alert__text { flex: 1; }
+
+/* Registro / CTA */
+.ry-callout {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid var(--ry-border);
+  font-size: 14px;
+  color: var(--ry-text-muted);
+  text-align: center;
+}
+
+.ry-callout a, .ry-link {
+  color: var(--ry-primary);
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.ry-callout a:hover, .ry-link:hover { text-decoration: underline; }
+
+.ry-foot {
+  font-size: 13px;
+}
+
+/* Proveedores sociales */
+.ry-social { margin-top: 18px; }
+
+.ry-social hr { display: none; }
+
+.ry-social h2, .ry-social h4 {
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ry-text-muted);
+  text-align: center;
+  margin: 0 0 10px;
+}
+
+.ry-social__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ry-social__btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 12px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--ry-text);
+  text-decoration: none;
+  border: 1px solid var(--ry-border);
+  border-radius: 10px;
+  background: var(--ry-surface);
+}
+
+.ry-social__btn:hover { background: var(--ry-bg); }
+.ry-social__btn--disabled { opacity: 0.55; pointer-events: none; }
+
+/* OTP */
+.ry-otp {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--ry-border);
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.ry-otp--selected { border-color: var(--ry-primary); background: var(--ry-primary-soft); }
+
+.ry-otp__header { display: flex; align-items: center; gap: 10px; }
+.ry-otp__title { font-weight: 500; font-size: 14px; }
+.ry-otp__glyph { color: var(--ry-primary); }
+.ry-otp__radio { accent-color: var(--ry-primary); }
+
+/* Responsive */
+@media (max-width: 480px) {
+  .ry-card { padding: 22px 18px 18px !important; }
+  .ry-brand__name { font-size: 19px; }
+  .ry-field--row { flex-direction: column; align-items: stretch; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; }
+}
