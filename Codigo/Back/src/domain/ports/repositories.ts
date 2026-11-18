@@ -6,6 +6,7 @@ import { Notification } from '../entities/notifications';
 import { Plan, Tenant } from '../entities/tenant';
 import { PlatformUser, TenantUser } from '../entities/notifications';
 import { UserProfile } from '../entities/profile';
+import { PendingRegistration } from '../entities/pending-registration';
 import { AppointmentStatus, SlotOccupation } from '../entities/types';
 
 export interface Page<T> {
@@ -26,6 +27,29 @@ export interface TenantRepository {
   create(tenant: Tenant, actor: string): Promise<Tenant>;
   update(tenant: Tenant, actor: string): Promise<Tenant>;
   softDelete(tenantId: string, actor: string): Promise<void>;
+}
+
+/**
+ * Recursos binarios del tenant (logos). Se guardan fuera del documento
+ * `tenants` para que las lecturas del negocio no arrastren la imagen.
+ */
+export interface TenantLogoAsset {
+  tenantId: string;
+  data: Buffer;
+  contentType: string;
+  version: number;
+  updatedAt: string;
+}
+
+export interface TenantAssetRepository {
+  findLogo(tenantId: string): Promise<TenantLogoAsset | null>;
+  saveLogo(input: {
+    tenantId: string;
+    data: Buffer;
+    contentType: string;
+    version: number;
+  }): Promise<void>;
+  deleteLogo(tenantId: string): Promise<void>;
 }
 
 export interface ServiceRepository {
@@ -64,6 +88,7 @@ export interface AppointmentRepository {
   countByTenant(tenantId: string, since?: string): Promise<number>;
   findByProfessional(tenantId: string, professionalId: string, from: string, to: string): Promise<Appointment[]>;
   findOverlapping(tenantId: string, professionalId: string, from: string, to: string): Promise<Appointment[]>;
+  findOverlappingByTenant(tenantId: string, from: string, to: string): Promise<Appointment[]>;
   findOccupiedIds(tenantId: string): Promise<string[]>;
   findHistoryByClient(
     input: { tenantId: string; clientId?: string; phone?: string; email?: string; documentId?: string },
@@ -165,8 +190,21 @@ export interface PlatformUserRepository {
 export interface UserProfileRepository {
   findByKeycloakUserId(keycloakUserId: string): Promise<UserProfile | null>;
   findByPhone(phoneDigits: string): Promise<UserProfile | null>;
+  findByVerificationToken(token: string): Promise<UserProfile | null>;
   upsert(profile: UserProfile): Promise<UserProfile>;
   deleteByKeycloakUserId(keycloakUserId: string): Promise<boolean>;
+}
+
+export interface PendingRegistrationRepository {
+  create(registration: PendingRegistration): Promise<void>;
+  findById(id: string): Promise<PendingRegistration | null>;
+  findByPhone(phoneDigits: string): Promise<PendingRegistration | null>;
+  findByEmail(email: string): Promise<PendingRegistration | null>;
+  deleteById(id: string): Promise<boolean>;
+  deleteByPhone(phoneDigits: string): Promise<boolean>;
+  markAsVerified(id: string): Promise<void>;
+  markCompleted(id: string, data: { keycloakUserId: string; completedAt: string }): Promise<void>;
+  incrementAttempts(id: string, attempts: number): Promise<void>;
 }
 
 export interface AuditLogRepository {

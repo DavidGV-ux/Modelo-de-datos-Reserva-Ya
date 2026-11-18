@@ -16,7 +16,9 @@ export async function publishAppointmentCreated(input: {
   if (!endpoint) return;
   const secret = process.env.WHATSAPP_BOT_SECRET ?? '';
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 2500);
+  // El bot a su vez llama a la Cloud API de Meta; 2.5s era demasiado corto
+  // y abortaba invitaciones que sí se estaban enviando.
+  const timer = setTimeout(() => controller.abort(), 8000);
   try {
     await fetch(endpoint, {
       method: 'POST',
@@ -90,7 +92,9 @@ export async function publishUserInvite(input: {
   if (!endpoint) return false;
   const secret = process.env.WHATSAPP_BOT_SECRET ?? '';
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 2500);
+  // El bot a su vez llama a la Cloud API de Meta; 2.5s era demasiado corto
+  // y abortaba invitaciones que sí se estaban enviando.
+  const timer = setTimeout(() => controller.abort(), 8000);
   try {
     const response = await fetch(endpoint, {
       method: 'POST',
@@ -112,6 +116,55 @@ export async function publishUserInvite(input: {
   } catch (err) {
     console.error(
       '[whatsapp-events] publish user.invite failed',
+      err instanceof Error ? err.message : err,
+    );
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+/**
+ * Envía por WhatsApp un código de 6 dígitos para verificar el número del
+ * usuario recién registrado. Mensaje predefinido (sin IA/tokens): el bot lo
+ * envía tal cual (o con una plantilla aprobada si está configurada).
+ */
+export async function publishPhoneVerificationCode(input: {
+  phone: string;
+  code: string;
+  name?: string;
+  channel?: string;
+}): Promise<boolean> {
+  const endpoint = process.env.WHATSAPP_EVENTS_ENDPOINT;
+  if (!endpoint) return false;
+  const secret = process.env.WHATSAPP_BOT_SECRET ?? '';
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8000);
+  try {
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        ...(secret ? { authorization: `Bearer ${secret}` } : {}),
+      },
+      body: JSON.stringify({
+        type: 'user.verify-code',
+        user: {
+          name: input.name,
+          phone: input.phone,
+          code: input.code,
+          ...(input.channel ? { channel: input.channel } : {}),
+        },
+      }),
+      signal: controller.signal,
+    });
+    if (!response.ok) {
+      console.error('[whatsapp-events] user.verify-code rejected', response.status);
+      return false;
+    }
+    return true;
+  } catch (err) {
+    console.error(
+      '[whatsapp-events] publish user.verify-code failed',
       err instanceof Error ? err.message : err,
     );
     return false;
