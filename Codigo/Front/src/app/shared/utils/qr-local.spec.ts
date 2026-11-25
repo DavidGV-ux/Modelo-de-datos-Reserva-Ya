@@ -1,4 +1,4 @@
-import { buildWhatsappDeepLink } from './qr-local';
+import { buildQrDataUrl, buildWhatsappDeepLink } from './qr-local';
 
 describe('buildWhatsappDeepLink', () => {
   const phone = '573123054870';
@@ -22,5 +22,14 @@ describe('buildWhatsappDeepLink', () => {
     expect(`${parsed.origin}${parsed.pathname}`).toBe(`https://wa.me/${phone}`);
     expect(parsed.searchParams.get('text')).toBe(message);
     expect(parsed.searchParams.get('text')).toContain(code);
+  });
+
+  it('genera el QR localmente como imagen del deep link, sin servicios de terceros', () => {
+    const url = buildWhatsappDeepLink(phone, message);
+
+    const dataUrl = buildQrDataUrl(url);
+
+    expect(dataUrl).toMatch(/^data:image\/(png|gif);base64,/);
+    expect(dataUrl.length).toBeGreaterThan(200);
   });
 });

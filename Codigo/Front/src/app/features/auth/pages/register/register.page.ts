@@ -34,7 +34,12 @@ import { startWith } from 'rxjs';
 import { firstValueFrom } from 'rxjs';
 import { ApiService } from '../../../../core/http/api.service';
 import { AuthService } from '../../../../core/auth/auth.service';
-import { buildWhatsappDeepLink } from '../../../../shared/utils/qr-local';
+import { buildQrDataUrl, buildWhatsappDeepLink } from '../../../../shared/utils/qr-local';
+import {
+  clearRegisterResume,
+  loadRegisterResume,
+  saveRegisterResume,
+} from '../../../../shared/utils/register-resume';
 
 interface RegisterPayload {
   firstName: string;
@@ -273,6 +278,18 @@ export class RegisterPage {
 
     // Limpiar polling al destruir el componente.
     this.destroy.onDestroy(() => this.stopVerificationPolling());
+
+    // Si se cerró la pestaña durante la verificación, retomar el mismo pendiente
+    // sin volver a enviar el formulario (evita cooldowns y "número ya asociado").
+    const session = typeof window === 'undefined' ? null : window.sessionStorage;
+    const resume = session ? loadRegisterResume(session) : null;
+    if (resume) {
+      this.verificationToken.set(resume.id);
+      this.code.set(resume.token);
+      this.registerEmail.set(resume.email);
+      this.step.set('code');
+      this.startVerificationPolling();
+    }
   }
 
   protected normalizeFirstName(): void {
@@ -379,7 +396,7 @@ export class RegisterPage {
         next: (res) => void this.onRegistered(res.id, res.verificationToken),
         error: (err: unknown) => {
           this.submitting.set(false);
-          void this.onError(this.errorCode(err));
+          void this.onError(this.errorCode(err), this.retryAfterSeconds(err));
         },
       });
   }
@@ -392,9 +409,15 @@ export class RegisterPage {
     this.verificationToken.set(id);
     this.code.set(verificationToken);
     this.submitting.set(false);
+    const rawPhone = this.form.getRawValue().phone;
+    this.storeResume(
+      verificationToken,
+      `+${this.phoneCode()}${rawPhone.trim().replace(/^\+/, '')}`,
+    );
     // Si el registro venía verificado por WhatsApp pero no completado, el back
     // lo completa aquí: pasar directo al login automático.
     if (!verificationToken) {
+      if (typeof window !== 'undefined') clearRegisterResume(window.sessionStorage);
       this.step.set('verified');
       await this.autoLogin();
       return;
@@ -431,6 +454,7 @@ export class RegisterPage {
         );
         if (res?.completed) {
           this.stopVerificationPolling();
+          if (typeof window !== 'undefined') clearRegisterResume(window.sessionStorage);
           this.step.set('verified');
           await this.autoLogin();
           return;
@@ -439,6 +463,7 @@ export class RegisterPage {
           // El registro pendiente ya no existe (TTL o id inválido): volver al
           // formulario (conserva los valores) para reintentar el registro.
           this.stopVerificationPolling();
+          if (typeof window !== 'undefined') clearRegisterResume(window.sessionStorage);
           this.verificationExpired.set(true);
           this.step.set('verified');
           return;
@@ -516,8 +541,25 @@ export class RegisterPage {
     }
   }
 
+  /** Conserva el token vigente para que el QR siga sirviendo tras recargar. */
+  private storeResume(token: string, phone?: string): void {
+    const session = typeof window === 'undefined' ? null : window.sessionStorage;
+    if (!token || !session) return;
+    const previous = loadRegisterResume(session);
+    saveRegisterResume(
+      {
+        id: this.verificationToken(),
+        token,
+        email: previous?.email ?? this.registerEmail(),
+        phone: phone ?? previous?.phone ?? '',
+      },
+      session,
+    );
+  }
+
   /** Vuelve al formulario cuando el código expiró antes de verificar. */
   protected restartRegistration(): void {
+    if (typeof window !== 'undefined') clearRegisterResume(window.sessionStorage);
     this.verificationExpired.set(false);
     this.autoLoginFailed.set(false);
     this.codeExpired.set(false);
@@ -560,6 +602,9 @@ export class RegisterPage {
     return buildWhatsappDeepLink(this.whatsappBotPhone, message);
   });
 
+  /** QR del mismo enlace: en el PC se escanea con la cámara del teléfono. */
+  protected readonly whatsappQr = computed(() => buildQrDataUrl(this.whatsappDeepLink()));
+
   protected async resendCode(): Promise<void> {
     if (this.resendCooldown() > 0) return;
     this.submitting.set(true);
@@ -568,7 +613,10 @@ export class RegisterPage {
     }).subscribe({
       next: (res) => {
         this.submitting.set(false);
-        if (res.verificationToken) this.code.set(res.verificationToken);
+        if (res.verificationToken) {
+          this.code.set(res.verificationToken);
+          this.storeResume(res.verificationToken);
+        }
         this.codeExpired.set(false);
         void this.startResendCooldown(res.retryAfterSeconds ?? 240);
         this.startVerificationPolling();
@@ -603,7 +651,10 @@ export class RegisterPage {
       next: (res) => {
         this.submitting.set(false);
         this.changingPhone.set(false);
-        if (res.verificationToken) this.code.set(res.verificationToken);
+        if (res.verificationToken) {
+          this.code.set(res.verificationToken);
+          this.storeResume(res.verificationToken, phone);
+        }
         this.codeExpired.set(false);
         void this.startResendCooldown(res.retryAfterSeconds ?? 240);
         this.startVerificationPolling();
@@ -629,6 +680,21 @@ export class RegisterPage {
   }
 
   private async onError(code: string, retryAfterSeconds?: number): Promise<void> {
+    // Si el back responde EMAIL_TAKEN, la cuenta ya se creó en el paso anterior
+    // (el usuario salió antes del login). Entrar con las credenciales que él
+    // envió, sin pedirle que repita el registro ni dejar el número atrapado.
+    if (
+      code === 'EMAIL_TAKEN' &&
+      this.registerEmail() &&
+      this.registerPassword()
+    ) {
+      if (typeof window !== 'undefined') clearRegisterResume(window.sessionStorage);
+      this.stopVerificationPolling();
+      this.submitting.set(false);
+      this.step.set('verified');
+      await this.autoLogin();
+      return;
+    }
     if (code === 'EMAIL_TAKEN') {
       const email = this.form.controls.email;
       email.setErrors({ ...(email.errors ?? {}), taken: true });
@@ -656,7 +722,7 @@ export class RegisterPage {
                   ? 'auth.register.error_no_pending'
                   : 'auth.register.error_generic';
     const messageParams =
-      code === 'CODE_RATE_LIMITED' ? { seconds: Math.ceil((retryAfterSeconds ?? 0) / 60) } : undefined;
+      code === 'CODE_RATE_LIMITED' ? { seconds: Math.ceil((retryAfterSeconds ?? 240) / 60) } : undefined;
 
     const result = await Swal.fire({
       icon: 'error',
@@ -808,8 +874,9 @@ export class RegisterPage {
 
   /** Segundos que el back pide esperar tras un error de rate limit. */
   private retryAfterSeconds(err: unknown): number | undefined {
-    const seconds = (err as { error?: { error?: { retryAfterSeconds?: number } } }).error?.error
-      ?.retryAfterSeconds;
+    const details = (err as { error?: { error?: { details?: { retryAfterSeconds?: number } } } })
+      .error?.error?.details;
+    const seconds = details?.retryAfterSeconds;
     return typeof seconds === 'number' ? seconds : undefined;
   }
 }
