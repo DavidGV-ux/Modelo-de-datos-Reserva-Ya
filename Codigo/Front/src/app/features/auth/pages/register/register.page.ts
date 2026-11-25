@@ -160,6 +160,7 @@ export class RegisterPage {
   private readonly registerEmail = signal<string>('');
   private readonly registerPassword = signal<string>('');
   private verificationPollInterval: any;
+  private visibilityHandler: (() => void) | null = null;
   private autoLoginInProgress = false;
   protected readonly countries = signal<{ isoCode: string; name: string; phonecode: string; flag: string }[]>([]);
   protected readonly phoneCode = computed(() => this.countries().find((c) => c.isoCode === this.form.controls.phoneCountry.value)?.phonecode ?? '');
@@ -484,6 +485,12 @@ export class RegisterPage {
 
     this.verificationPollInterval = setInterval(() => void check(), 3000);
     void check();
+
+    // Al volver del chat de WhatsApp el navegador puede tener el intervalo
+    // pausado: comprobar de inmediato también al recuperar la pestaña.
+    this.visibilityHandler = () => void check();
+    document.addEventListener('visibilitychange', this.visibilityHandler);
+    window.addEventListener('pageshow', this.visibilityHandler);
   }
 
   /** Detiene el polling de verificación. */
@@ -491,6 +498,11 @@ export class RegisterPage {
     if (this.verificationPollInterval) {
       clearInterval(this.verificationPollInterval);
       this.verificationPollInterval = null;
+    }
+    if (this.visibilityHandler) {
+      document.removeEventListener('visibilitychange', this.visibilityHandler);
+      window.removeEventListener('pageshow', this.visibilityHandler);
+      this.visibilityHandler = null;
     }
     this.verifying.set(false);
   }
