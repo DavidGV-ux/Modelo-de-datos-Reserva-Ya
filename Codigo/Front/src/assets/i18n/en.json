@@ -278,7 +278,7 @@
     "branding_title": "Business personalization",
     "branding_subtitle": "Make your public page reflect your business identity.",
     "branding_logo_title": "Business logo",
-    "branding_logo_hint": "PNG, JPG or WebP. Automatically optimized to a lightweight format (max 160 KB).",
+    "branding_logo_hint": "PNG, JPG or WebP, 64x64 to 512x512 px. Source file up to 8 MB; optimized to 160 KB max.",
     "branding_logo_upload": "Upload logo",
     "branding_logo_remove": "Remove logo",
     "branding_logo_empty": "No logo yet",
@@ -502,7 +502,8 @@
     "biz_phone": "Phone",
     "biz_address": "Address",
     "plan_basico_note": "Basic plan included: per-booking fee with no monthly charge. Upgrade to Pro later for advanced features.",
-    "create": "Create my business"
+    "create": "Create my business",
+    "logo_upload_failed": "Business created, but the logo could not be saved. You can upload it from Personalization."
   },
   "profile": {
     "complete_title": "Complete your profile",

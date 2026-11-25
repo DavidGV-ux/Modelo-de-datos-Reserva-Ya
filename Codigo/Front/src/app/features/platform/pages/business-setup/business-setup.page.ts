@@ -15,11 +15,11 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSnackBarModule, MatSnackBar } from '@angular/material/snack-bar';
-import { TranslatePipe } from '@ngx-translate/core';
+import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { AuthService } from '../../../../core/auth/auth.service';
 import { DashboardService } from '../../../dashboard/services/dashboard.service';
 import { PlatformService, TENANT_CATEGORIES, TenantCategoryId } from '../../services/platform.service';
-import { compressLogoFile } from '../../../../shared/utils/image-compression';
+import { compressLogoFile, isSupportedLogoFile, logoErrorKind } from '../../../../shared/utils/image-compression';
 
 export const OWNER_TENANT_KEY = 'reserwaya.ownerTenant';
 
@@ -127,7 +127,8 @@ const COLOMBIAN_CITIES = [
                 @if (logoDataUrl(); as url) {
                   <img [src]="url" alt="logo" class="setup__logo-preview" />
                 }
-                <input type="file" accept="image/*" (change)="onLogoSelected($event)" [disabled]="uploadingLogo()" />
+                <p class="setup__logo-hint">{{ 'dashboard.branding_logo_hint' | translate }}</p>
+                <input type="file" accept="image/png,image/jpeg,image/webp" (change)="onLogoSelected($event)" [disabled]="uploadingLogo()" />
               </div>
 
               <div class="setup__row">
@@ -167,6 +168,9 @@ const COLOMBIAN_CITIES = [
             <ng-template matStepLabel>{{ 'onboarding.step_confirm' | translate }}</ng-template>
 
             <div class="setup__summary">
+              @if (logoDataUrl(); as logoUrl) {
+                <img [src]="logoUrl" alt="logo" class="setup__summary-logo" />
+              }
               <h2>{{ form.value.name }}</h2>
               <p class="setup__summary-slug">reserwaya.com/{{ form.value.slug }}</p>
               <p>{{ form.value.tagline }}</p>
@@ -265,6 +269,17 @@ const COLOMBIAN_CITIES = [
     .setup__nav button[mat-flat-button][disabled] mat-spinner {
       color: inherit;
     }
+    .setup__logo-hint {
+      color: var(--mat-sys-on-surface-variant);
+      font-size: 12px;
+      margin: 4px 0 0;
+    }
+    .setup__summary-logo {
+      width: 64px;
+      height: 64px;
+      object-fit: contain;
+      margin-bottom: 12px;
+    }
     .setup__summary {
       margin: 20px 0;
       padding: 24px;
@@ -297,6 +312,7 @@ export class BusinessSetupPage {
   private readonly dashboard = inject(DashboardService);
   private readonly router = inject(Router);
   private readonly snackbar = inject(MatSnackBar);
+  private readonly translate = inject(TranslateService);
 
   protected readonly submitting = signal(false);
   protected readonly categories = TENANT_CATEGORIES;
@@ -359,12 +375,20 @@ export class BusinessSetupPage {
     const file = input.files?.[0];
     input.value = '';
     if (!file) return;
+    if (!isSupportedLogoFile(file)) {
+      this.snackbar.open(this.translate.instant('dashboard.branding_logo_error_type'), undefined, { duration: 3000 });
+      return;
+    }
     this.uploadingLogo.set(true);
     try {
       const dataUrl = await compressLogoFile(file);
       this.logoDataUrl.set(dataUrl);
-    } catch {
-      this.snackbar.open('common.error', undefined, { duration: 3000 });
+    } catch (error) {
+      this.snackbar.open(
+        this.translate.instant(`dashboard.branding_logo_error_${logoErrorKind(error)}`),
+        undefined,
+        { duration: 3000 },
+      );
     } finally {
       this.uploadingLogo.set(false);
     }
@@ -415,7 +439,15 @@ export class BusinessSetupPage {
           if (logo) {
             this.dashboard.uploadOwnerLogo(result.tenant.tenantId, logo, (result.tenant as { version?: number }).version ?? 1).subscribe({
               next: () => finish(),
-              error: () => finish(),
+              error: (err) => {
+                const detail = (err as { error?: { error?: { message?: string } } })?.error?.error?.message;
+                this.snackbar.open(
+                  `${this.translate.instant('onboarding.logo_upload_failed')}${detail ? ` ${detail}` : ''}`,
+                  undefined,
+                  { duration: 6000, panelClass: 'snackbar-error' },
+                );
+                finish();
+              },
             });
           } else {
             finish();
