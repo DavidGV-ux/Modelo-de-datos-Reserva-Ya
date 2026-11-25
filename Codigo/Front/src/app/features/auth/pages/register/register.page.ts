@@ -86,13 +86,15 @@ function passwordsMatch(password: AbstractControl): ValidatorFn {
 }
 
 /**
- * Complejidad mínima: al menos una letra y un dígito.
- * Mismo criterio que el backend (`zod`: password must contain letters and digits).
+ * Misma política que el realm de Keycloak (y que el backend): minúscula,
+ * mayúscula, dígito y carácter especial. Evita verificar el WhatsApp con una
+ * contraseña que Keycloak rechazará después con un 400.
  */
 function passwordComplexity(control: AbstractControl): ValidationErrors | null {
   const value = typeof control.value === 'string' ? control.value : '';
   if (!value) return null;
-  return /[a-zA-Z]/.test(value) && /\d/.test(value) ? null : { complexity: true };
+  const ok = /[a-z]/.test(value) && /[A-Z]/.test(value) && /\d/.test(value) && /[^A-Za-z0-9]/.test(value);
+  return ok ? null : { complexity: true };
 }
 
 /** Los nombres no admiten dígitos. */

@@ -554,7 +554,7 @@
       "password_required": "Enter a password",
       "password_min": "Password must be at least 8 characters",
       "password_max": "Password cannot exceed 72 characters",
-      "password_hint": "Between 8 and 72 characters",
+      "password_hint": "8 to 72 characters, with uppercase, lowercase, a number and a special character",
       "password_show": "Show password",
       "password_hide": "Hide password",
       "strength_label": "Password strength",
@@ -616,7 +616,7 @@
       "error_code_rate_limited": "A code was just sent. Wait about {{seconds}} min and try again, or go back and fix the number.",
       "error_too_many_attempts": "Too many failed verification attempts. Submit the form again to generate a new code.",
       "error_no_pending": "The pending registration no longer exists. Submit the form again to generate a new code.",
-      "password_complexity": "The password must include at least one letter and one number",
+      "password_complexity": "The password must include uppercase, lowercase, a number and a special character",
       "first_name_no_html": "The first name cannot contain HTML tags",
       "last_name_no_html": "The last name cannot contain HTML tags"
     }

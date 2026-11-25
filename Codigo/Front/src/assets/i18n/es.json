@@ -554,7 +554,7 @@
       "password_required": "Ingresa una contraseña",
       "password_min": "La contraseña debe tener al menos 8 caracteres",
       "password_max": "La contraseña no puede superar los 72 caracteres",
-      "password_hint": "Entre 8 y 72 caracteres",
+      "password_hint": "8 a 72 caracteres, con mayúscula, minúscula, número y carácter especial",
       "password_show": "Mostrar contraseña",
       "password_hide": "Ocultar contraseña",
       "strength_label": "Seguridad de la contraseña",
@@ -616,7 +616,7 @@
       "error_code_rate_limited": "Ya se envió un código hace poco. Espera unos {{seconds}} min e inténtalo de nuevo, o regresa y corrige el número.",
       "error_too_many_attempts": "Demasiados intentos fallidos de verificación. Vuelve a enviar el formulario para generar un código nuevo.",
       "error_no_pending": "El registro pendiente ya no existe. Vuelve a enviar el formulario para generar un código nuevo.",
-      "password_complexity": "La contraseña debe incluir al menos una letra y un número",
+      "password_complexity": "La contraseña debe incluir mayúscula, minúscula, número y carácter especial",
       "first_name_no_html": "El nombre no puede contener etiquetas HTML",
       "last_name_no_html": "El apellido no puede contener etiquetas HTML"
     }
