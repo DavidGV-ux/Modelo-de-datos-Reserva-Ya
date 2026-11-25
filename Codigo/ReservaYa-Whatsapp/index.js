@@ -78,7 +78,15 @@ app.post('/webhook', async (req, res) => {
   // Verificación por mensaje entrante: el usuario envía desde su WhatsApp el
   // mensaje predefinido del deep link (token RY-...) o un código legacy de
   // 6 dígitos. El Back valida que el remitente sea el teléfono del registro.
-  const { matchVerificationCode } = require('./audit-helpers');
+  const { matchVerificationCode, verificationFailureMessage } = require('./audit-helpers');
+  const sendVerificationFailure = async (phone, error) => {
+    try {
+      await whatsappService.sendMessage(phone, verificationFailureMessage(error));
+      Utils.log('info', `Motivo de verificación fallida enviado a ${phone}`);
+    } catch (sendErr) {
+      Utils.log('warn', `No se pudo avisar del fallo a ${phone}: ${sendErr.message}`);
+    }
+  };
   const codeMatch = info.isEmpty || info.hasStatus ? null : matchVerificationCode(info.messageBody);
   if (codeMatch) {
     const value = codeMatch[0];
@@ -111,12 +119,16 @@ app.post('/webhook', async (req, res) => {
         } catch (welcomeErr) {
           Utils.log('warn', `No se pudo enviar bienvenida a ${info.from}: ${welcomeErr.message}`);
         }
+      } else {
+        await sendVerificationFailure(info.from, verifyResp.data?.error);
       }
       Utils.log('info', `user.code-received desde whatsapp: ${info.from} (ok=${verifyResp.data?.ok})`);
       return res.status(200).send('ok');
     } catch (err) {
       Utils.log('error', `user.code-received verify failed: ${err.message}`);
-      return res.status(502).send('verify-code failed');
+      await sendVerificationFailure(info.from, err);
+      // 200 para que Meta no reintente y el usuario no reciba el mismo aviso varias veces.
+      return res.status(200).send('ok');
     }
   }
 
