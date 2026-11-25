@@ -373,26 +373,28 @@ export class RegisterPage {
     };
 
     this.submitting.set(true);
-    this.api.post<{ ok: true; id: string; code: string }>('/public/auth/register', payload).subscribe({
-      next: (res) => void this.onRegistered(res.id, res.code),
-      error: (err: unknown) => {
-        this.submitting.set(false);
-        void this.onError(this.errorCode(err));
-      },
-    });
+    this.api
+      .post<{ ok: true; id: string; verificationToken: string }>('/public/auth/register', payload)
+      .subscribe({
+        next: (res) => void this.onRegistered(res.id, res.verificationToken),
+        error: (err: unknown) => {
+          this.submitting.set(false);
+          void this.onError(this.errorCode(err));
+        },
+      });
   }
 
   protected login(): void {
     this.auth.login().subscribe({ error: () => undefined });
   }
 
-  private async onRegistered(id: string, code: string): Promise<void> {
+  private async onRegistered(id: string, verificationToken: string): Promise<void> {
     this.verificationToken.set(id);
-    this.code.set(code);
+    this.code.set(verificationToken);
     this.submitting.set(false);
     // Si el registro venía verificado por WhatsApp pero no completado, el back
     // lo completa aquí: pasar directo al login automático.
-    if (!code) {
+    if (!verificationToken) {
       this.step.set('verified');
       await this.autoLogin();
       return;
@@ -561,12 +563,12 @@ export class RegisterPage {
   protected async resendCode(): Promise<void> {
     if (this.resendCooldown() > 0) return;
     this.submitting.set(true);
-    this.api.post<{ ok: true; retryAfterSeconds?: number; code?: string }>('/public/auth/resend-code', {
+    this.api.post<{ ok: true; retryAfterSeconds?: number; verificationToken?: string }>('/public/auth/resend-code', {
       id: this.verificationToken(),
     }).subscribe({
       next: (res) => {
         this.submitting.set(false);
-        if (res.code) this.code.set(res.code);
+        if (res.verificationToken) this.code.set(res.verificationToken);
         this.codeExpired.set(false);
         void this.startResendCooldown(res.retryAfterSeconds ?? 240);
         this.startVerificationPolling();
@@ -594,14 +596,14 @@ export class RegisterPage {
   protected async confirmChangePhone(newPhone: string): Promise<void> {
     const phone = `+${this.phoneCode()}${newPhone.trim().replace(/^\+/, '')}`;
     this.submitting.set(true);
-    this.api.post<{ ok: true; retryAfterSeconds?: number; code?: string }>('/public/auth/resend-code', {
+    this.api.post<{ ok: true; retryAfterSeconds?: number; verificationToken?: string }>('/public/auth/resend-code', {
       id: this.verificationToken(),
       phone,
     }).subscribe({
       next: (res) => {
         this.submitting.set(false);
         this.changingPhone.set(false);
-        if (res.code) this.code.set(res.code);
+        if (res.verificationToken) this.code.set(res.verificationToken);
         this.codeExpired.set(false);
         void this.startResendCooldown(res.retryAfterSeconds ?? 240);
         this.startVerificationPolling();

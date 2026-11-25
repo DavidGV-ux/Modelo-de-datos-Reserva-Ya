@@ -31,11 +31,17 @@ test('sendVerificationCodeViaFyn envía el header x-internal-secret', async () =
   }
 });
 
-test('matchVerificationCode solo acepta mensajes exactamente de 6 dígitos', () => {
+test('matchVerificationCode acepta el código exacto o el mensaje del deep link RY-...', () => {
   const { matchVerificationCode } = require('../audit-helpers');
+  const deepLinkEs = 'ReservaYa: tu código de verificación es RY-ab12cd34ef56. Enviá este mensaje para validar tu número.';
+  const deepLinkEn = 'ReservaYa: your verification code is RY-ab12cd34ef56. Send this message to verify your number.';
+
   assert.equal(matchVerificationCode('123456')?.[0], '123456');
   assert.equal(matchVerificationCode('  123456  ')?.[0], '123456');
+  assert.equal(matchVerificationCode(deepLinkEs)?.[0], 'RY-ab12cd34ef56');
+  assert.equal(matchVerificationCode(deepLinkEn)?.[0], 'RY-ab12cd34ef56');
   assert.equal(matchVerificationCode('pedido 123456'), null);
+  assert.equal(matchVerificationCode('RY-ab12cd34ef56 sin ReservaYa'), null);
   assert.equal(matchVerificationCode('1234567'), null);
   assert.equal(matchVerificationCode('abc123'), null);
   assert.equal(matchVerificationCode(''), null);
