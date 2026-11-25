@@ -407,11 +407,16 @@
                   </button>
                   <p class="whatsapp-verify__hint">{{ 'auth.register.whatsapp_verify_hint' | translate }}</p>
 
-                  <!-- RY-QR-THIRDPARTY-CODE: sin QR de terceros; el OTP solo viaja a wa.me -->
+                  <!-- RY-QR-THIRDPARTY-CODE: QR generado en el navegador; el token solo viaja a wa.me -->
                   <div class="qr-container">
                     <a [href]="whatsappDeepLink()" target="_blank" rel="noopener noreferrer">
-                      {{ 'auth.register.whatsapp_verify_button' | translate }}
+                      <img
+                        class="whatsapp-qr"
+                        [src]="whatsappQr()"
+                        [alt]="'auth.register.qr_alt' | translate"
+                      />
                     </a>
+                    <p class="qr-hint">{{ 'auth.register.qr_hint' | translate }}</p>
                   </div>
                 </div>
 
