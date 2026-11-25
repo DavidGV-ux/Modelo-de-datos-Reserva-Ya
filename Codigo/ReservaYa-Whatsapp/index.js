@@ -75,16 +75,20 @@ app.post('/webhook', async (req, res) => {
 
   whatsappService.markRead(info.from).catch(() => {});
 
-  // Verificación por mensaje entrante: si el usuario envía un texto con un
-  // código de 6 dígitos (p. ej. vía deep link de WhatsApp Web), se delega al
-  // Back para validar y habilitar la cuenta.
+  // Verificación por mensaje entrante: el usuario envía desde su WhatsApp el
+  // mensaje predefinido del deep link (token RY-...) o un código legacy de
+  // 6 dígitos. El Back valida que el remitente sea el teléfono del registro.
   const { matchVerificationCode } = require('./audit-helpers');
   const codeMatch = info.isEmpty || info.hasStatus ? null : matchVerificationCode(info.messageBody);
   if (codeMatch) {
+    const value = codeMatch[0];
+    const verificationPayload = /^RY-/i.test(value)
+      ? { phone: info.from, verificationToken: value }
+      : { phone: info.from, code: value };
     try {
       const verifyResp = await reservayaApi.client.post(
         '/public/whatsapp/verify-code',
-        { phone: info.from, code: codeMatch[0] },
+        verificationPayload,
         {
           headers: {
             'content-type': 'application/json',
