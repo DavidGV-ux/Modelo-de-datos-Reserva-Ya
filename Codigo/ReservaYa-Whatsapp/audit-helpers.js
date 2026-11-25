@@ -11,4 +11,22 @@ function matchVerificationCode(messageBody) {
   return deepLink ? [deepLink[1]] : null;
 }
 
-module.exports = { matchVerificationCode };
+const VERIFICATION_FAILURE_MESSAGES = {
+  CODE_EXPIRED: '⏰ Tu código venció. Vuelve a la página de registro para generar uno nuevo.',
+  NO_PENDING_REGISTRATION:
+    'No encontramos un registro pendiente para este número. Usa el WhatsApp con el que te registraste o inicia el registro de nuevo en la web.',
+  INVALID_CODE:
+    'El código o token no es correcto. Cópialo exactamente como aparece en la página de registro y envíalo desde el mismo número de WhatsApp.',
+  TOO_MANY_ATTEMPTS:
+    'Hubo demasiados intentos fallidos. Vuelve a la página de registro para generar un código nuevo.',
+};
+
+function verificationFailureMessage(error) {
+  const code = error?.response?.data?.error?.code || error?.code || '';
+  return (
+    VERIFICATION_FAILURE_MESSAGES[code] ||
+    'No pudimos verificar tu cuenta en este momento. Inténtalo de nuevo desde la página de registro.'
+  );
+}
+
+module.exports = { matchVerificationCode, verificationFailureMessage };
