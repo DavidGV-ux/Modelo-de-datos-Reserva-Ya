@@ -10,7 +10,7 @@ import { TranslatePipe, TranslateService } from '@ngx-translate/core';
 import { RouterLink } from '@angular/router';
 import { DashboardService } from '../../../dashboard/services/dashboard.service';
 import { Tenant } from '../../../../shared/models/domain.model';
-import { compressLogoFile } from '../../../../shared/utils/image-compression';
+import { compressLogoFile, isSupportedLogoFile, logoErrorKind } from '../../../../shared/utils/image-compression';
 import { DEFAULT_BRAND_COLOR, contrastColor, normalizeBrandColor } from '../../../../shared/utils/color';
 
 @Component({
@@ -103,7 +103,7 @@ import { DEFAULT_BRAND_COLOR, contrastColor, normalizeBrandColor } from '../../.
             <input
               #fileInput
               type="file"
-              accept="image/png,image/jpeg,image/webp,image/svg+xml"
+              accept="image/png,image/jpeg,image/webp"
               hidden
               (change)="onFileSelected($event)"
             />
@@ -148,9 +148,13 @@ import { DEFAULT_BRAND_COLOR, contrastColor, normalizeBrandColor } from '../../.
 
             <div class="brand-preview" [style.--preview-brand]="selectedColor()">
               <div class="brand-preview__bar">
-                <span class="brand-preview__mark" [style.background]="selectedColor()" [style.color]="previewOnColor()">
-                  {{ branding()?.name?.charAt(0) }}
-                </span>
+                @if (branding()?.logoUrl; as logoUrl) {
+                  <img class="brand-preview__logo" [src]="logoUrl" [alt]="branding()?.name" />
+                } @else {
+                  <span class="brand-preview__mark" [style.background]="selectedColor()" [style.color]="previewOnColor()">
+                    {{ branding()?.name?.charAt(0) }}
+                  </span>
+                }
                 <strong>{{ branding()?.name }}</strong>
               </div>
               <div class="brand-preview__hero">
@@ -381,6 +385,13 @@ import { DEFAULT_BRAND_COLOR, contrastColor, normalizeBrandColor } from '../../.
         font-weight: 800;
       }
 
+      &__logo {
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+        object-fit: contain;
+      }
+
       &__hero {
         padding: 20px 16px;
         display: flex;
@@ -520,7 +531,7 @@ export class OwnerPersonalizationPage implements OnInit {
     const file = input.files?.[0];
     input.value = '';
     if (!file) return;
-    if (!file.type?.startsWith('image/')) {
+    if (!isSupportedLogoFile(file)) {
       this.snackbar.open(this.translate.instant('dashboard.branding_logo_error_type'), undefined, { duration: 3000 });
       return;
     }
@@ -539,14 +550,10 @@ export class OwnerPersonalizationPage implements OnInit {
       })
       .catch((error: unknown) => {
         this.uploading.set(false);
-        const message =
-          error instanceof Error && error.message === 'output_too_large'
-            ? this.translate.instant('dashboard.branding_logo_error_size')
-            : error instanceof Error && error.message === 'invalid_image'
-              ? this.translate.instant('dashboard.branding_logo_error_type')
-              : error instanceof Error && error.message === 'image_too_small'
-                ? this.translate.instant('dashboard.branding_logo_error_small')
-                : this.translate.instant('dashboard.branding_logo_error');
+        const serverMessage = (error as { error?: { error?: { message?: string } } })?.error?.error?.message;
+        const message = serverMessage
+          ? serverMessage
+          : this.translate.instant(`dashboard.branding_logo_error_${logoErrorKind(error)}`);
         this.snackbar.open(message, undefined, { duration: 3500 });
       });
   }

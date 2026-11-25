@@ -278,7 +278,7 @@
     "branding_title": "Personalización del negocio",
     "branding_subtitle": "Haz que tu página pública refleje la identidad de tu negocio.",
     "branding_logo_title": "Logo del negocio",
-    "branding_logo_hint": "PNG, JPG o WebP. Se optimiza automáticamente a un formato ligero (máx. 160 KB).",
+    "branding_logo_hint": "PNG, JPG o WebP de 64x64 a 512x512 px. Archivo original hasta 8 MB; se optimiza a 160 KB como máximo.",
     "branding_logo_upload": "Subir logo",
     "branding_logo_remove": "Quitar logo",
     "branding_logo_empty": "Aún no tienes logo",
@@ -502,7 +502,8 @@
     "biz_phone": "Teléfono",
     "biz_address": "Dirección",
     "plan_basico_note": "Plan Básico incluido: comisión por reserva sin pago mensual. Activa Pro más adelante para funciones avanzadas.",
-    "create": "Crear mi negocio"
+    "create": "Crear mi negocio",
+    "logo_upload_failed": "El negocio se creó pero no se pudo guardar el logo. Puedes subirlo desde Personalización."
   },
   "profile": {
     "complete_title": "Completa tu perfil",

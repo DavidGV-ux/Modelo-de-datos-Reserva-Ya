@@ -1,6 +1,29 @@
-const MAX_FILE_BYTES = 8 * 1024 * 1024;
-const MAX_OUTPUT_BYTES = 160 * 1024;
-const MAX_DIMENSION = 512;
+/** Debe coincidir con LOGO_RULES del Back: la validación se repite en el servidor. */
+export const LOGO_RULES = {
+  maxFileBytes: 8 * 1024 * 1024,
+  maxOutputBytes: 160 * 1024,
+  minDimension: 64,
+  maxDimension: 512,
+  types: ['image/png', 'image/jpeg', 'image/webp'],
+} as const;
+
+const MAX_FILE_BYTES = LOGO_RULES.maxFileBytes;
+const MAX_OUTPUT_BYTES = LOGO_RULES.maxOutputBytes;
+const MAX_DIMENSION = LOGO_RULES.maxDimension;
+
+export function isSupportedLogoFile(file: File): boolean {
+  return (LOGO_RULES.types as readonly string[]).includes(file.type);
+}
+
+export type LogoErrorKind = 'type' | 'small' | 'size' | 'generic';
+
+export function logoErrorKind(error: unknown): LogoErrorKind {
+  const message = error instanceof Error ? error.message : '';
+  if (message === 'invalid_image' || message === 'unsupported_type') return 'type';
+  if (message === 'image_too_small') return 'small';
+  if (message === 'file_too_large' || message === 'output_too_large') return 'size';
+  return 'generic';
+}
 
 function fitSize(width: number, height: number, maxDimension: number): { width: number; height: number } {
   const scale = Math.min(1, maxDimension / Math.max(width, height, 1));
@@ -43,8 +66,8 @@ function blobToDataUrl(blob: Blob): Promise<string> {
 }
 
 export async function compressLogoFile(file: File): Promise<string> {
-  if (!file || !file.type?.startsWith('image/')) {
-    throw new Error('invalid_image');
+  if (!file || !isSupportedLogoFile(file)) {
+    throw new Error('unsupported_type');
   }
   if (file.size > MAX_FILE_BYTES) {
     throw new Error('file_too_large');
@@ -54,7 +77,7 @@ export async function compressLogoFile(file: File): Promise<string> {
   const sourceWidth = image.naturalWidth || image.width || MAX_DIMENSION;
   const sourceHeight = image.naturalHeight || image.height || MAX_DIMENSION;
 
-  if (sourceWidth < 64 || sourceHeight < 64) {
+  if (sourceWidth < LOGO_RULES.minDimension || sourceHeight < LOGO_RULES.minDimension) {
     throw new Error('image_too_small');
   }
 
@@ -65,7 +88,7 @@ export async function compressLogoFile(file: File): Promise<string> {
       return canvas.toDataURL('image/webp').startsWith('data:image/webp');
     })();
 
-  let maxDimension = MAX_DIMENSION;
+  let maxDimension: number = MAX_DIMENSION;
   let quality = 0.86;
 
   for (let attempt = 0; attempt < 12; attempt += 1) {

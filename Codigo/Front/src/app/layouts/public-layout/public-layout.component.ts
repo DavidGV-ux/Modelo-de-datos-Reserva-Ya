@@ -33,7 +33,7 @@ import { contrastColor, normalizeBrandColor } from '../../shared/utils/color';
       <mat-sidenav #snav mode="over" class="portal__sidenav" opened="false">
         <div class="portal__sidenav-header">
           @if (hasLogo()) {
-            <img class="portal__logo" [src]="logoUrl()" [alt]="tenant()?.name" />
+            <img class="portal__logo" [src]="logoUrl()" [alt]="tenant()?.name" (error)="logoFailed.set(true)" />
           } @else {
             <span class="portal__mark">{{ brandInitial() }}</span>
           }
@@ -73,7 +73,7 @@ import { contrastColor, normalizeBrandColor } from '../../shared/utils/color';
 
             <a class="portal__brand" [routerLink]="['/', tenant()?.slug]">
               @if (hasLogo()) {
-                <img class="portal__logo" [src]="logoUrl()" [alt]="tenant()?.name" />
+                <img class="portal__logo" [src]="logoUrl()" [alt]="tenant()?.name" (error)="logoFailed.set(true)" />
               } @else {
                 <span class="portal__mark">{{ brandInitial() }}</span>
               }
@@ -126,7 +126,7 @@ import { contrastColor, normalizeBrandColor } from '../../shared/utils/color';
             <div>
               <div class="portal__footer-brand">
                 @if (hasLogo()) {
-                  <img class="portal__logo" [src]="logoUrl()" [alt]="tenant()?.name" />
+                  <img class="portal__logo" [src]="logoUrl()" [alt]="tenant()?.name" (error)="logoFailed.set(true)" />
                 } @else {
                   <span class="portal__mark">{{ brandInitial() }}</span>
                 }
@@ -337,7 +337,7 @@ export class PublicLayout implements OnInit {
   );
   protected readonly logoUrl = computed(() => this.tenant()?.logoUrl ?? null);
   protected readonly logoFailed = signal(false);
-  protected readonly hasLogo = computed(() => !!this.logoUrl());
+  protected readonly hasLogo = computed(() => !!this.logoUrl() && !this.logoFailed());
   protected readonly year = new Date().getFullYear();
 
   constructor() {
