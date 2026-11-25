@@ -8,6 +8,27 @@ import { AuthService } from '../../../../core/auth/auth.service';
 import { RegisterPage } from './register.page';
 
 describe('RegisterPage — reanudación tras salir del registro', () => {
+  it('rechaza contraseñas que Keycloak no aceptaría antes de enviar el registro', () => {
+    TestBed.configureTestingModule({
+      imports: [RegisterPage],
+      providers: [
+        provideHttpClient(),
+        provideHttpClientTesting(),
+        provideNoopAnimations(),
+        provideTranslateService({ lang: 'es', fallbackLang: 'es' }),
+        { provide: AuthService, useValue: { login: () => undefined } },
+        { provide: Router, useValue: { navigateByUrl: async () => true } },
+      ],
+    });
+
+    const fixture = TestBed.createComponent(RegisterPage);
+    const password = (fixture.componentInstance as any).form.controls.password;
+    password.setValue('Secreta123');
+    expect(password.hasError('complexity')).toBe(true);
+    password.setValue('Secreta123!');
+    expect(password.hasError('complexity')).toBe(false);
+  });
+
   it('EMAIL_TAKEN entra con las credenciales ya enviadas en vez de mostrar el error', async () => {
     const loginWithPassword = async (email: string, password: string) =>
       email === 'ana@test.com' && password === 'secreta123';

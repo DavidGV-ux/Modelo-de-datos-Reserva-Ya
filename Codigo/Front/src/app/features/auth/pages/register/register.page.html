@@ -241,6 +241,8 @@
                       <mat-error>{{ 'auth.register.password_min' | translate }}</mat-error>
                     } @else if (form.controls.password.hasError('maxlength')) {
                       <mat-error>{{ 'auth.register.password_max' | translate }}</mat-error>
+                    } @else if (form.controls.password.hasError('complexity')) {
+                      <mat-error>{{ 'auth.register.password_complexity' | translate }}</mat-error>
                     }
                     <mat-hint>{{ 'auth.register.password_hint' | translate }}</mat-hint>
                   </mat-form-field>
